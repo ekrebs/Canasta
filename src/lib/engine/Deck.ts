@@ -19,7 +19,6 @@ const ranks: Rank[] = [
     Rank.Queen, 
     Rank.King, 
     Rank.Ace, 
-    Rank.Joker
 ];
 
 const suits:Suit[] = [
@@ -38,33 +37,46 @@ function buildCard( rank:Rank, suit:Suit|'Red'|'Black', value:number ):ICard {
     }
 }
 
-function isRedThree( card:ICard ) {
-    if (Rank.Three === card.rank) {
-        if (Suit.Diamond === card.suit || Suit.Heart === card.suit) {
-            return true;
+export class Deck extends CardStack {
+
+    private buildDeck() {
+        const newCards:ICard[] = [];
+        for (const suit of suits) {
+            for (let i = 0; i < ranks.length; i++) {
+                let value = 5;
+                switch ( ranks[i] ) {
+                    case '10':
+                    case 'J':
+                    case 'Q':
+                    case 'K':
+                        value = 10;
+                        break;
+                    case 'A':
+                    case '2':
+                        value = 20;
+                        break;
+                    case '3':
+                        if (Suit.Diamond === suit || Suit.Heart === suit) {
+                            value = 100;
+                        }
+                        break;
+                }
+                newCards.push({
+                    id: v4(),
+                    suit,
+                    rank: ranks[i],
+                    value
+                })
+            }
         }
+        newCards.push({id: v4(), rank:Rank.Joker, suit:'Red', value:50})
+        newCards.push({id: v4(), rank:Rank.Joker, suit:'Black', value:50})
+
+        this.cards = newCards;
     }
 
-    return false;
-}
-
-export class Deck extends CardStack {
     constructor() {
         super();
-        let index = 0;
-        suits.forEach((suit) => {
-            index = 2;
-            ranks.forEach((rank) => {
-                if ( Rank.Joker === rank) {
-                    return;
-                }
-                this.add(buildCard(rank, suit, index))
-                index ++;
-            });
-        });
-
-        this.add(buildCard(Rank.Joker, 'Red', 15));
-        this.add(buildCard(Rank.Joker, 'Black', 15));
-
+        this.buildDeck();
     }
 }
