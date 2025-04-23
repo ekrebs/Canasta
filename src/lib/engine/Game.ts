@@ -35,12 +35,15 @@ export class Game implements IGame {
 		this.players = players;
 		// this.teams = this.buildTeams(players);
         const deck1 = new Deck();
+        console.log('Deck 1 length: ' + deck1.cards.length);
         const deck2 = new Deck();
+        console.log("Deck 2 length: " + deck2.cards.length);
 		const stack = new CardStack([
             ...deck1.cards,
             ...deck2.cards
         ]);
         this.stock = stack;
+        console.log("Stock length: " + this.stock.cards.length);
 		this.pile = new Pile(false); 
 	}
 

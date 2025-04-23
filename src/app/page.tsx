@@ -39,7 +39,7 @@ export default function Home() {
 				<button onClick={startGame}>Start Game</button>
 				<ul>
 					{game && game.stock && game.stock.cards.map((card, index) => 
-						<li key={index}>{card.rank + card.suit}</li>
+						<li key={index}>{`Card number ${index}: ${card.rank} ${card.suit}`}</li>
 					)}
 				</ul>
 			</main>

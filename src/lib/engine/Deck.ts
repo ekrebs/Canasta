@@ -28,17 +28,7 @@ const suits:Suit[] = [
     Suit.Spade
 ]
 
-function buildCard( rank:Rank, suit:Suit|'Red'|'Black', value:number ):ICard {
-    return {
-        id: rank.toString() + suit.toString(),
-        rank: rank.toString(),
-        suit: suit.toString(),
-        value
-    }
-}
-
 export class Deck extends CardStack {
-
     private buildDeck() {
         const newCards:ICard[] = [];
         for (const suit of suits) {
