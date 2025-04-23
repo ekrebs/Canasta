@@ -1,8 +1,6 @@
-import { Rank } from "./Rank";
-import { Suit } from "./Suit";
-
 export interface ICard {
-	suit: Suit;
-	rank: Rank;
+	id: string;
+	suit: string;
+	rank: string;
 	value: number;
 }

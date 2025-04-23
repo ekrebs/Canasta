@@ -2,6 +2,8 @@ import { ICard } from "@/schema/ICard";
 import { ICardStack } from "@/schema/ICardStack";
 import { Rank } from "@/schema/Rank";
 import { Suit } from "@/schema/Suit";
+import { CardStack } from "./CardStack";
+import { v4 } from "uuid";
 
 const ranks: Rank[] = [
     Rank.Two, 
@@ -27,11 +29,11 @@ const suits:Suit[] = [
     Suit.Spade
 ]
 
-function buildCard( rank:Rank, suit:Suit, value:number ) {
+function buildCard( rank:Rank, suit:Suit|'Red'|'Black', value:number ):ICard {
     return {
-        id: `${rank}${suit}`,
-        rank,
-        suit,
+        id: rank.toString() + suit.toString(),
+        rank: rank.toString(),
+        suit: suit.toString(),
         value
     }
 }
@@ -46,22 +48,23 @@ function isRedThree( card:ICard ) {
     return false;
 }
 
-export class Deck implements ICardStack {
-    cards:ICard[] = [];
-
-    add( card:ICard ) {
-        this.cards.push(card)
-    }
-    
-    draw():ICard | undefined {
-        return this.cards.pop();
-    }
-
+export class Deck extends CardStack {
     constructor() {
+        super();
+        let index = 0;
         suits.forEach((suit) => {
-            ranks.forEach((rank, index) => {
-                this.add(buildCard(rank, suit, index+2));
-            })
+            index = 2;
+            ranks.forEach((rank) => {
+                if ( Rank.Joker === rank) {
+                    return;
+                }
+                this.add(buildCard(rank, suit, index))
+                index ++;
+            });
         });
+
+        this.add(buildCard(Rank.Joker, 'Red', 15));
+        this.add(buildCard(Rank.Joker, 'Black', 15));
+
     }
 }

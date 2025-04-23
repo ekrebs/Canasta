@@ -1,6 +1,6 @@
 export enum Suit {
-	"Heart",
-	"Spade",
-	"Club",
-	"Diamond",
+	"Heart" = "❤️",
+	"Spade" = "♠️",
+	"Club" = "♣️",
+	"Diamond" = "♦️",
 }

@@ -1,9 +1,7 @@
-import { IHandScore } from "./iHandScore";
+import { ICardStack } from "./ICardStack";
 import { IPlayer } from "./IPlayer";
 
-export interface IHand {
+export interface IHand extends ICardStack {
     id: string;
-    winner: IPlayer;
-    scores: IHandScore;
-    elapsedTime: number;
+    player: IPlayer;
 }
