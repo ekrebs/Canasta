@@ -2,6 +2,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-	// initialize game state here
-	return NextResponse.json({ message: "Game started!" });
+ 	return NextResponse.json({ message: "Game started!" });
 }
