@@ -1,4 +1,4 @@
-import { IPlayerProfile } from "./IPlayerProfile";
+import { IPlayerProfile } from "./IPlayerProfile.js";
 
 export interface IPlayer {
     id: string;

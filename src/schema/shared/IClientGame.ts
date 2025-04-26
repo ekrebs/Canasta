@@ -1,6 +1,6 @@
-import { IClientCard } from "./IClientCard";
-import { IClientHand } from "./IClientHand";
-import { IClientPlayer } from "./IClientPlayer";
+import { IClientCard } from "./IClientCard.js";
+import { IClientHand } from "./IClientHand.js";
+import { IClientPlayer } from "./IClientPlayer.js";
 
 export interface IClientGame {
     id: string,

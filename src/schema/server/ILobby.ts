@@ -1,4 +1,4 @@
-import { ILobbyPlayer } from "./ILobbyPlayer";
+import { ILobbyPlayer } from "./ILobbyPlayer.js";
 
 export interface ILobby {
     id: string,

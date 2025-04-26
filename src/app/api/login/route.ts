@@ -1,5 +1,5 @@
-import { IUser } from "@/schema/shared/IUser";
-import { NextResponse } from "next/server";
+import { IUser } from "@/schema/shared/IUser.js";
+import { NextResponse } from "next/server.js";
 
 const mockUsers: Record<string, IUser> = {
     "player1": { id: "player1", login:"player1", nickname: "Player 1" },

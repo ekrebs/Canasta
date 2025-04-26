@@ -1,5 +1,6 @@
 'use client';
-import { IUser } from "@/schema/shared/IUser";
+
+import { IUser } from "@/schema/shared/IUser.js";
 import { useEffect, useState } from "react";
 import { v4 } from "uuid";
 import { io, Socket } from "socket.io-client";
@@ -35,9 +36,7 @@ export default function Home() {
 		socket.on('connect', () => {
 			console.log('Connected to server socket:', socket?.id );
 
-			socket?.emit('join-server', {
-				user
-			})
+			socket?.emit('join-server', user)
 		});
 
 		return () => {

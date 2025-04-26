@@ -1,6 +1,6 @@
-import { ICardStack } from "@/schema/server/ICardStack";
-import { shuffle } from "../utils/shuffle";
-import { ICard } from "@/schema/server/ICard";
+import { ICardStack } from "@/schema/server/ICardStack.js";
+import { shuffle } from "../utils/shuffle.js";
+import { ICard } from "@/schema/server/ICard.js";
 
 export class CardStack implements ICardStack {
     cards:ICard[] = [];

@@ -1,4 +1,4 @@
-import { IClientCard } from "./IClientCard";
+import { IClientCard } from "./IClientCard.js";
 
 export interface IClientHand {
     id: string,

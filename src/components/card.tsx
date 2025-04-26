@@ -1,4 +1,4 @@
-import { ICard } from "@/schema/server/ICard";
+import { ICard } from "@/schema/server/ICard.js";
 
 type CardProps = {
     card: ICard

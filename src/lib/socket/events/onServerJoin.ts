@@ -1,7 +1,6 @@
-import { serverMemory } from "@/lib/server/ServerMemory";
-import { IUser } from "@/schema/shared/IUser";
-import { Server } from "socket.io";
-import { Socket } from "socket.io-client";
+import { serverMemory } from "../../server/serverMemory.js";
+import { IUser } from "../../../schema/shared/IUser.js";
+import { Server, Socket } from "socket.io";
 import { v4 } from "uuid";
 
 export function onServerJoin( socket:Socket, io: Server, user:IUser ) {

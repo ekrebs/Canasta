@@ -1,10 +1,10 @@
-import { ICardStack } from "./ICardStack";
-import { IHand } from "./IHand";
-import { IMeld } from "./IMeld";
-import { IPile } from "./IPile";
-import { IPlayer } from "./IPlayer";
-import { ITeam } from "./ITeam";
-import { ITurn } from "./ITurn";
+import { ICardStack } from "./ICardStack.js";
+import { IHand } from "./IHand.js";
+import { IMeld } from "./IMeld.js";
+import { IPile } from "./IPile.js";
+import { IPlayer } from "./IPlayer.js";
+import { ITeam } from "./ITeam.js";
+import { ITurn } from "./ITurn.js";
 
 export interface IGame {
 	id: string;

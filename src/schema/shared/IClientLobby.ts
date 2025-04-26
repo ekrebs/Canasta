@@ -1,4 +1,4 @@
-import { IClientLobbyPlayer } from "./IClientLobbyPlayer";
+import { IClientLobbyPlayer } from "./IClientLobbyPlayer.js";
 
 export interface IClientLobby {
     id: string,

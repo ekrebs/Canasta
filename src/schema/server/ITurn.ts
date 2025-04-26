@@ -1,4 +1,4 @@
-import { IPlayer } from "./IPlayer";
+import { IPlayer } from "./IPlayer.js";
 
 export interface ITurn {
     id: string;
