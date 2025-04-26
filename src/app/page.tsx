@@ -8,6 +8,7 @@ import { v4 } from "uuid";
 export default function Home() {
 	const [ game, setGame ] = useState<IGame|undefined>(undefined);
 
+
 	function startGame() {
 		const currentGame = new Game([
 			{
