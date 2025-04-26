@@ -1,48 +1,63 @@
 'use client';
-
-import { Game } from "@/lib/engine/Game";
-import { IGame } from "@/schema/IGame";
-import { useState } from "react";
+import { IUser } from "@/schema/shared/IUser";
+import { useEffect, useState } from "react";
 import { v4 } from "uuid";
+import { io, Socket } from "socket.io-client";
+
+let socket: Socket | undefined = undefined;
 
 export default function Home() {
-	const [ game, setGame ] = useState<IGame|undefined>(undefined);
+	const [ user, setUser ] = useState<IUser|undefined>(undefined)
+	// const [ game, setGame ] = useState<IGame|undefined>(undefined);
 
+	async function login( login:string ) {
+		const response = await fetch('/api/login', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({login})
+		})
 
-	function startGame() {
-		const currentGame = new Game([
-			{
-				id: v4(),
-				index: 0,
-				profile: {
-					id: v4(),
-					handle: "Player 1",
-				},
-				isBot: false,
-			},
-			{
-				id: v4(),
-				index: 1,
-				profile: {
-					id: v4(),
-					handle: "Player 2",
-				},
-				isBot: false,
-			},
-		]);
-		currentGame.start();
-		setGame(currentGame);
+		if (!response.ok) {
+			console.error('Login failed');
+			return;
+		}
+
+		setUser(await response.json())
 	}
+
+	useEffect(() => {
+		if ( !user ) return;
+
+		socket = io({
+			path: '/api/socket'
+		});
+
+		socket.on('connect', () => {
+			console.log('Connected to server socket:', socket?.id );
+
+			socket?.emit('join-server', {
+				user
+			})
+		});
+
+		return () => {
+			socket?.disconnect();
+		}
+	}, [user])
+
 
 	return (
 		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
 			<main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-				<button onClick={startGame}>Start Game</button>
-				<ul>
-					{game && game.stock && game.stock.cards.map((card, index) => 
-						<li key={index}>{`Card number ${index}: ${card.rank} ${card.suit}`}</li>
-					)}
-				</ul>
+				{!user ? (
+					<>
+						<button onClick={() => login("player1")}>Log in as Player 1</button>
+						<button onClick={() => login("player2")}>Log in as Player 2</button>
+					</>
+				): (
+					<>Logged In as {user.nickname}</>
+				)}
+				
 			</main>
 		</div>
 	);

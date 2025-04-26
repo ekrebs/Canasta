@@ -1,6 +1,6 @@
-import { ICard } from "@/schema/ICard";
-import { ICardStack } from "@/schema/ICardStack";
+import { ICardStack } from "@/schema/server/ICardStack";
 import { shuffle } from "../utils/shuffle";
+import { ICard } from "@/schema/server/ICard";
 
 export class CardStack implements ICardStack {
     cards:ICard[] = [];
@@ -14,7 +14,7 @@ export class CardStack implements ICardStack {
     }
 
     shuffle() {
-        // this.cards = shuffle(this.cards);
+        this.cards = shuffle(this.cards);
     }
 
     constructor( cards:ICard[]=[] ) {

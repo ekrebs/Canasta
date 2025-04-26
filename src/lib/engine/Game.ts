@@ -1,16 +1,16 @@
-import { ICardStack } from "@/schema/ICardStack";
-import { IGame } from "@/schema/IGame";
-import { IHand } from "@/schema/IHand";
-import { IMeld } from "@/schema/IMeld";
-import { IPile } from "@/schema/IPile";
-import { IPlayer } from "@/schema/IPlayer";
-import { ITeam } from "@/schema/ITeam";
-import { ITurn } from "@/schema/ITurn";
 import { v4 as uuidv4 } from "uuid";
 import { CardStack } from "./CardStack";
 import { Pile } from "./Pile";
 import { PlayerHand } from "./PlayerHand";
 import { Deck } from "./Deck";
+import { IGame } from "@/schema/server/IGame";
+import { IPlayer } from "@/schema/server/IPlayer";
+import { ITeam } from "@/schema/server/ITeam";
+import { ICardStack } from "@/schema/server/ICardStack";
+import { IPile } from "@/schema/server/IPile";
+import { IMeld } from "@/schema/server/IMeld";
+import { IHand } from "@/schema/server/IHand";
+import { ITurn } from "@/schema/server/ITurn";
 
 const defaultRules = {
     cardsDealt: 13

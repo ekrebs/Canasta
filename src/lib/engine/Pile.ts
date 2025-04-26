@@ -1,5 +1,4 @@
-import { ICard } from "@/schema/ICard";
-import { IPile } from "@/schema/IPile";
+import { IPile } from "@/schema/server/IPile";
 import { CardStack } from "./CardStack";
 
 export class Pile extends CardStack implements IPile {

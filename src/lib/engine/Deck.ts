@@ -1,9 +1,8 @@
-import { ICard } from "@/schema/ICard";
-import { ICardStack } from "@/schema/ICardStack";
-import { Rank } from "@/schema/Rank";
-import { Suit } from "@/schema/Suit";
+import { Rank } from "@/schema/server/Rank";
 import { CardStack } from "./CardStack";
 import { v4 } from "uuid";
+import { Suit } from "@/schema/server/Suit";
+import { ICard } from "@/schema/server/ICard";
 
 const ranks: Rank[] = [
     Rank.Two, 
