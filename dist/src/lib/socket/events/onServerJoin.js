@@ -8,5 +8,11 @@ export function onServerJoin(socket, io, user) {
         socketId: socket.id,
         handle: user.nickname
     };
-    socket.emit('ack', { message: 'Connected' });
+    socket.emit('lobby-list', {
+        lobbies: Object.values(serverMemory.lobbies).map((lobby) => ({
+            id: lobby.id,
+            name: lobby.name,
+            playerCount: Object.values(lobby.players).length
+        }))
+    });
 }

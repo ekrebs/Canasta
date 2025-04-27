@@ -1,55 +1,28 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "esModuleInterop": true,
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "outDir": "dist",
-    "rootDir": ".",
-    "forceConsistentCasingInFileNames": true,
-    "types": [
-      "node"
-    ],
-    "allowSyntheticDefaultImports": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
-    "noEmit": true
-  },
-  "include": [
-    "server.ts",
-    "src/lib",
-    "src/schema",
-    "src/lib/engine",
-    "src/lib/socket",
-    "src/lib/server",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/app",
-    ".next",
-    "public"
-  ]
+	"compilerOptions": {
+		"target": "ES2020",
+		"lib": ["dom", "dom.iterable", "esnext"],
+		"allowJs": true,
+		"skipLibCheck": true,
+		"strict": true,
+		"incremental": true,
+		"baseUrl": ".",
+		"plugins": [
+			{
+				"name": "next"
+			}
+		],
+		"paths": {
+			"@/*": ["./src/*"]
+		},
+		"noEmit": true,
+		"module": "esnext",
+		"esModuleInterop": true,
+		"moduleResolution": "node",
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"jsx": "preserve"
+	},
+	"include": ["next-env.d.ts", "src", ".next/types/**/*.ts"],
+	"exclude": ["node_modules", "dist", "src/lib/server", "src/lib/socket"]
 }

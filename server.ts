@@ -9,7 +9,7 @@ const port = parseInt(process.env.PORT || "3000", 10);
 
 async function main() {
 	const nextModule = await import("next");
-	const next = nextModule.default as unknown as (opts: { dev: boolean; hostname: string; port: number }) => any;;
+	const next = nextModule.default as unknown as (opts: { dev: boolean; hostname: string; port: number }) => any;
 	const app = next({ dev, hostname, port });
 	await app.prepare();
 

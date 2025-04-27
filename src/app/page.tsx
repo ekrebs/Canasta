@@ -4,11 +4,13 @@ import { IUser } from "@/schema/shared/IUser.js";
 import { useEffect, useState } from "react";
 import { v4 } from "uuid";
 import { io, Socket } from "socket.io-client";
+import { IClientLobby } from "@/schema/shared/IClientLobby";
 
 let socket: Socket | undefined = undefined;
 
 export default function Home() {
 	const [ user, setUser ] = useState<IUser|undefined>(undefined)
+	const [ lobbies, setLobbies ] = useState<IClientLobby[]>([]);
 	// const [ game, setGame ] = useState<IGame|undefined>(undefined);
 
 	async function login( login:string ) {
@@ -39,11 +41,19 @@ export default function Home() {
 			socket?.emit('join-server', user)
 		});
 
+		socket.on('lobby-list', (data) => {
+			setLobbies(data.lobbies);
+					console.log(data);
+		});
+
 		return () => {
 			socket?.disconnect();
 		}
 	}, [user])
 
+	function lobbyJoin( lobby:IClientLobby ) {
+
+	}
 
 	return (
 		<div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -54,7 +64,19 @@ export default function Home() {
 						<button onClick={() => login("player2")}>Log in as Player 2</button>
 					</>
 				): (
-					<>Logged In as {user.nickname}</>
+					<div>
+						Logged In as {user.nickname}
+						{lobbies && 0 < lobbies.length &&
+							<>
+								{lobbies.map((lobby) => 
+									<div className='' key={lobby.id}>
+										<h2>{`${lobby.name} (${lobby.playerCount})`}</h2>
+										<button onClick={() => lobbyJoin(lobby)}>Join</button>
+									</div>
+								)}
+							</>
+						}
+					</div>
 				)}
 				
 			</main>

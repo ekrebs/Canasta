@@ -7,7 +7,6 @@ const port = parseInt(process.env.PORT || "3000", 10);
 async function main() {
     const nextModule = await import("next");
     const next = nextModule.default;
-    ;
     const app = next({ dev, hostname, port });
     await app.prepare();
     const handler = app.getRequestHandler();
