@@ -1,5 +1,5 @@
-import { ILobby } from "@/schema/server/ILobby.js";
-import { IServerMemory } from "@/schema/server/IServerMemory.js";
+import type { ILobby } from "@/schema/server/ILobby.js";
+import type { IServerMemory } from "@/schema/server/IServerMemory.js";
 
 const mockLobbies:Record<string, ILobby> = {
     "lobby1": {
@@ -16,5 +16,6 @@ const mockLobbies:Record<string, ILobby> = {
 
 export const serverMemory: IServerMemory = {
     connectedPlayers: {},
-    lobbies: mockLobbies
+    lobbies: mockLobbies,
+    games: {},
 }

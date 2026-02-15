@@ -1,7 +1,7 @@
-import { Rank } from "@/schema/server/Rank.js";
+import { Rank } from "../../schema/server/Rank.js";
 import { CardStack } from "./CardStack.js";
 import { v4 } from "uuid";
-import { Suit } from "@/schema/server/Suit.js";
+import { Suit } from "../../schema/server/Suit.js";
 const ranks = [
     Rank.Two,
     Rank.Three,

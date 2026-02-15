@@ -1,7 +1,9 @@
 import { IConnectedPlayer } from "./IConnectedPlayer.js";
+import { IGame } from "./IGame.js";
 import { ILobby } from "./ILobby.js";
 
 export interface IServerMemory {
     connectedPlayers: Record<string, IConnectedPlayer>;
-    lobbies: Record<string, ILobby>
+    lobbies: Record<string, ILobby>;
+    games: Record<string, IGame>;
 }

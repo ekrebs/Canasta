@@ -15,6 +15,7 @@ export class Game {
         this.melds = [];
         this.hands = [];
         this.status = "Not Started";
+        this.turnPhase = "draw";
         this.players = players;
         // this.teams = this.buildTeams(players);
         const deck1 = new Deck();
@@ -32,11 +33,73 @@ export class Game {
     start() {
         this.status = "Active";
         this.startTime = new Date().toISOString();
+        this.winnerPlayerId = undefined;
+        this.turnPhase = "draw";
         this.stock.shuffle();
         this.dealer = this.pickDealer();
         this.dealCards();
         this.turn = this.initTurn();
         this.activePlayer = this.turn.player;
+    }
+    drawStock(playerId) {
+        this.assertPlayerTurn(playerId);
+        if (this.turnPhase !== "draw") {
+            throw new Error("You must draw before discarding or ending your turn.");
+        }
+        const card = this.stock.draw();
+        if (!card) {
+            throw new Error("The stock is empty.");
+        }
+        const hand = this.getHandByPlayerId(playerId);
+        hand.cards.push(card);
+        this.turnPhase = "discard";
+        return card;
+    }
+    discard(playerId, cardId) {
+        this.assertPlayerTurn(playerId);
+        if (this.turnPhase !== "discard") {
+            throw new Error("You must draw before discarding.");
+        }
+        const hand = this.getHandByPlayerId(playerId);
+        const cardIndex = hand.cards.findIndex((card) => card.id === cardId);
+        if (cardIndex < 0) {
+            throw new Error("Card not found in hand.");
+        }
+        const [card] = hand.cards.splice(cardIndex, 1);
+        this.pile.cards.push(card);
+        if (hand.cards.length === 0) {
+            this.status = "Complete";
+            this.winnerPlayerId = playerId;
+            return card;
+        }
+        this.turnPhase = "complete-turn";
+        return card;
+    }
+    endTurn(playerId) {
+        this.assertPlayerTurn(playerId);
+        if (this.turnPhase !== "complete-turn") {
+            throw new Error("You must discard before ending your turn.");
+        }
+        const activePlayerIndex = this.players.findIndex((player) => player.id === playerId);
+        if (activePlayerIndex < 0) {
+            throw new Error("Active player was not found.");
+        }
+        const nextPlayerIndex = (activePlayerIndex + 1) % this.players.length;
+        const nextPlayer = this.players[nextPlayerIndex];
+        this.turn = {
+            id: uuidv4(),
+            player: nextPlayer,
+            startTime: new Date().toISOString(),
+        };
+        this.activePlayer = nextPlayer;
+        this.turnPhase = "draw";
+    }
+    getHandByPlayerId(playerId) {
+        const hand = this.hands.find((playerHand) => playerHand.player.id === playerId);
+        if (!hand) {
+            throw new Error("Player hand not found.");
+        }
+        return hand;
     }
     // private buildTeams(players: IPlayer[]): ITeam[] {
     // 	// 2 teams of 2 in standard 4-player Canasta
@@ -73,5 +136,13 @@ export class Game {
             player: this.players[nextIndex],
             startTime: new Date().toISOString(),
         };
+    }
+    assertPlayerTurn(playerId) {
+        if (this.status !== "Active") {
+            throw new Error(`Game is not active (${this.status}).`);
+        }
+        if (!this.activePlayer || this.activePlayer.id !== playerId) {
+            throw new Error("It is not your turn.");
+        }
     }
 }

@@ -1,6 +1,30 @@
-import { IClientLobbyPlayer } from "../../../schema/shared/IClientLobbyPlayer.js";
+import type { ILeaveLobbyPayload } from "../../../schema/shared/ISocketPayloads.js";
 import { Server, Socket } from "socket.io";
+import { serverMemory } from "../../server/serverMemory.js";
+import { emitLobbyList, getConnectedPlayerBySocket, removeConnectedPlayerFromLobby } from "./eventUtils.js";
 
-export function onLobbyDisconnect(socket:Socket, io:Server, props:IClientLobbyPlayer ) {
-    
+export function onLobbyDisconnect(socket:Socket, io:Server, payload?:ILeaveLobbyPayload ) {
+    const connectedPlayer = getConnectedPlayerBySocket(socket.id);
+    if (!connectedPlayer) {
+        return;
+    }
+
+    const targetLobbyId = payload?.lobbyId ?? connectedPlayer.lobbyId;
+    if (!targetLobbyId) {
+        return;
+    }
+
+    removeConnectedPlayerFromLobby(connectedPlayer, targetLobbyId);
+    socket.leave(targetLobbyId);
+    socket.emit("lobby-left", { lobbyId: targetLobbyId });
+    socket.emit("ready-updated", { ready: false });
+
+    const game = serverMemory.games[targetLobbyId];
+    if (game && game.status === "Active") {
+        game.status = "Terminated";
+        io.to(targetLobbyId).emit("game-ended", { lobbyId: targetLobbyId, reason: "player-left" });
+    }
+    delete serverMemory.games[targetLobbyId];
+
+    emitLobbyList(io);
 }

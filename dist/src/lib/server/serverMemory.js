@@ -12,5 +12,6 @@ const mockLobbies = {
 };
 export const serverMemory = {
     connectedPlayers: {},
-    lobbies: mockLobbies
+    lobbies: mockLobbies,
+    games: {},
 };

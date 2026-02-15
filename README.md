@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Planning
+
+Project roadmap and milestone plan: `ROADMAP.md`
+
 ## Getting Started
 
 First, run the development server:
@@ -14,7 +18,12 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3050](http://localhost:3050) with your browser to see the result.
+
+## Build Artifacts
+
+`dist/` contains generated server runtime JavaScript from TypeScript source.
+It is intentionally gitignored and should be rebuilt in CI/deploy environments.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

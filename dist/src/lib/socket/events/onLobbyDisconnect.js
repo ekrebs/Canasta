@@ -1,2 +1,23 @@
-export function onLobbyDisconnect(socket, io, props) {
+import { serverMemory } from "../../server/serverMemory.js";
+import { emitLobbyList, getConnectedPlayerBySocket, removeConnectedPlayerFromLobby } from "./eventUtils.js";
+export function onLobbyDisconnect(socket, io, payload) {
+    const connectedPlayer = getConnectedPlayerBySocket(socket.id);
+    if (!connectedPlayer) {
+        return;
+    }
+    const targetLobbyId = payload?.lobbyId ?? connectedPlayer.lobbyId;
+    if (!targetLobbyId) {
+        return;
+    }
+    removeConnectedPlayerFromLobby(connectedPlayer, targetLobbyId);
+    socket.leave(targetLobbyId);
+    socket.emit("lobby-left", { lobbyId: targetLobbyId });
+    socket.emit("ready-updated", { ready: false });
+    const game = serverMemory.games[targetLobbyId];
+    if (game && game.status === "Active") {
+        game.status = "Terminated";
+        io.to(targetLobbyId).emit("game-ended", { lobbyId: targetLobbyId, reason: "player-left" });
+    }
+    delete serverMemory.games[targetLobbyId];
+    emitLobbyList(io);
 }
