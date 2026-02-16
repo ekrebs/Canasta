@@ -53,31 +53,26 @@ export function emitGameStateToLobby(io: Server, lobbyId: string) {
     const game = serverMemory.games[lobbyId];
     const lobby = serverMemory.lobbies[lobbyId];
     if (!(game instanceof Game) || !lobby) {
-        logger.warn(`emitGameStateToLobby: game or lobby not found`, { lobbyId, hasGame: game ? 'yes' : 'no', hasLobby: lobby ? 'yes' : 'no' });
+        logger.warn(`emitGameStateToLobby: game or lobby not found`, { lobbyId });
         return;
     }
 
     const lobbyPlayers = Object.values(lobby.players);
-    logger.debug(`emitGameStateToLobby: emitting to ${lobbyPlayers.length} lobby players`, { lobbyId, gameId: game.id });
-
     lobbyPlayers.forEach((lobbyPlayer) => {
+        if (!lobbyPlayer.socketId) {
+            logger.warn(`emitGameStateToLobby: socket ID missing for player`, { lobbyId, playerId: lobbyPlayer.playerId });
+            return;
+        }
         const targetSocket = io.sockets.sockets.get(lobbyPlayer.socketId);
         if (!targetSocket) {
-            logger.warn(`emitGameStateToLobby: socket not found`, { lobbyId, playerId: lobbyPlayer.playerId, socketId: lobbyPlayer.socketId });
-            console.log(`[emitGameStateToLobby] Socket not found for ${lobbyPlayer.socketId}, available sockets:`, Array.from(io.sockets.sockets.keys()));
+            logger.warn(`emitGameStateToLobby: socket not found`, { lobbyId, playerId: lobbyPlayer.playerId });
             return;
         }
 
-        logger.debug(`emitGameStateToLobby: emitting to player`, { lobbyId, playerId: lobbyPlayer.playerId, socketId: lobbyPlayer.socketId });
-        console.log(`[emitGameStateToLobby] Emitting game-state to socket ${lobbyPlayer.socketId}`);
-        
-        const clientGame = toClientGame(game, lobbyPlayer.playerId);
         targetSocket.emit("game-state", {
             lobbyId,
-            game: clientGame,
+            game: toClientGame(game, lobbyPlayer.playerId),
         });
-        
-        console.log(`[emitGameStateToLobby] Emitted game-state for player ${lobbyPlayer.playerId}`);
     });
 }
 

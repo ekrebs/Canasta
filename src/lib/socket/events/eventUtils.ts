@@ -8,6 +8,7 @@ function buildLobbyList(): IClientLobby[] {
         id: lobby.id,
         name: lobby.name,
         playerCount: Object.keys(lobby.players).length,
+        hasActiveGame: !!serverMemory.games[lobby.id] && serverMemory.games[lobby.id].status === "Active",
     }));
 }
 

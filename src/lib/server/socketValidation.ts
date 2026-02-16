@@ -25,6 +25,7 @@ export const GameActionPayloadSchema = z.object({
 
 export const DisconnectLobbyPayloadSchema = z.object({
 	lobbyId: z.string().optional(),
+	forfeit: z.boolean().optional(),  // true if leaving during active game
 });
 
 // Outgoing payloads (server → client)

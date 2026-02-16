@@ -48,7 +48,6 @@ function startLobbyGame(io: Server, lobbyId: string) {
         })
         .filter((player): player is IPlayer => !!player);
 
-    logger.debug(`startLobbyGame: mapped to ${gamePlayers.length} game players`, { lobbyId });
     if (gamePlayers.length < 2) {
         logger.warn(`startLobbyGame: not enough game players`, { lobbyId, playerCount: gamePlayers.length });
         return;

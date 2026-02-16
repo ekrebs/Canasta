@@ -92,51 +92,54 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 		}
 
 		addLog('🔌 Socket handler attached');
-		console.log(`[GameScreen] Socket attached: ${socket.id}, connected: ${socket.connected}`);
 
 		const handleGameState = (data: GameStateEvent) => {
-			console.log(`[GameScreen] Received game-state:`, data);
 			addLog(`📡 Game state: ${data.game.status}, phase: ${data.game.turnPhase}, myId: ${data.game.hand.playerId.slice(0, 8)}, activeId: ${data.game.activePlayerId.slice(0, 8)}`);
 			setGame(data.game);
 			setError(undefined);
 		};
 
 		const handleGameStarted = (data: { lobbyId: string; gameId: string }) => {
-			console.log(`[GameScreen] Game started:`, data);
 			addLog(`🎮 Game started: ${data.gameId.slice(0, 8)}`);
 		};
 
 		const handleGameEnded = () => {
-			console.log(`[GameScreen] Game ended`);
 			addLog('🏁 Game ended');
 			setGame(undefined);
 			onGameEnd();
 		};
 
 		const handleGameComplete = () => {
-			console.log(`[GameScreen] Game complete`);
 			addLog('✅ Game complete');
 			onGameEnd();
 		};
 
 		const handleError = (data: ServerErrorEvent) => {
-			console.log(`[GameScreen] Server error:`, data);
 			addLog(`❌ Server error: ${data.message}`);
 			setError(data.message);
 		};
 
 		const handleDisconnect = (reason: string) => {
-			console.log(`[GameScreen] Disconnected:`, reason);
 			addLog(`🔴 Disconnected: ${reason}`);
-			onGameEnd();
+			// Keep game state in case of automatic reconnection
+			// So the game can resume smoothly
 		};
 
 		const handleConnect = () => {
-			console.log(`[GameScreen] Connected`);
 			addLog('🟢 Connected to server');
+			// Request game state after reconnection
+			socket.emit("get-game-state");
+			addLog('📤 Requested game state after reconnect');
 		};
 
-		console.log(`[GameScreen] Registering event listeners`);
+		const handleServerNotification = (data: { message: string; type: string }) => {
+			if (data.type === "reconnect") {
+				addLog(`🔵 ${data.message}`);
+			} else {
+				addLog(`ℹ️ ${data.message}`);
+			}
+		};
+
 		socket.on("game-state", handleGameState);
 		socket.on("game-started", handleGameStarted);
 		socket.on("game-ended", handleGameEnded);
@@ -144,10 +147,11 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 		socket.on("server-error", handleError);
 		socket.on("disconnect", handleDisconnect);
 		socket.on("connect", handleConnect);
+		socket.on("server-notification", handleServerNotification);
 
 		// Request current game state in case we missed the initial emit
 		socket.emit("get-game-state");
-		console.log(`[GameScreen] Requested current game state`);
+		addLog('📤 Requested current game state');
 
 		return () => {
 			socket.off("game-state", handleGameState);
@@ -157,6 +161,7 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 			socket.off("server-error", handleError);
 			socket.off("disconnect", handleDisconnect);
 			socket.off("connect", handleConnect);
+			socket.off("server-notification", handleServerNotification);
 		};
 	}, [socketRef, onGameEnd]);
 

@@ -18,4 +18,5 @@ export const serverMemory: IServerMemory = {
     connectedPlayers: {},
     lobbies: mockLobbies,
     games: {},
+    disconnectTimeouts: new Map(),
 }

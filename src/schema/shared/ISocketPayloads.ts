@@ -8,6 +8,7 @@ export interface IClientReadyPayload {
 
 export interface ILeaveLobbyPayload {
     lobbyId?: string;
+    forfeit?: boolean;  // true if leaving during active game (commits to loss)
 }
 
 export type GameActionType = "draw-stock" | "discard" | "end-turn";

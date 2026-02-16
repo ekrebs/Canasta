@@ -15,7 +15,6 @@ export default function Home() {
 	const initializedRef = useRef(false);
 
 	async function login(loginValue: string) {
-		console.log(`[LOGIN] Attempting login as: ${loginValue}`);
 		const response = await fetch("/api/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -28,7 +27,6 @@ export default function Home() {
 		}
 
 		const userData = await response.json();
-		console.log(`[LOGIN] Success: ${userData.id} (${userData.nickname})`);
 		setError(undefined);
 		setUser(userData);
 	}
@@ -56,6 +54,22 @@ export default function Home() {
 
 		socket.emit("join-server", user);
 	}, [user]);
+
+	// Listen for game-started event (e.g., on reconnection to active game)
+	useEffect(() => {
+		const socket = socketRef.current;
+		if (!socket) return;
+
+		const handleGameStarted = () => {
+			setGameStarted(true);
+		};
+
+		socket.on("game-started", handleGameStarted);
+
+		return () => {
+			socket.off("game-started", handleGameStarted);
+		};
+	}, []);  // Empty dependencies - socket is persistent for page lifetime
 
 	if (!user) {
 		return (

@@ -1,6 +1,7 @@
 import type { ILeaveLobbyPayload } from "../../../schema/shared/ISocketPayloads.js";
 import { Server, Socket } from "socket.io";
 import { serverMemory } from "../../server/serverMemory.js";
+import { logger } from "../../server/logger.js";
 import { validatePayload } from "../../server/validatePayload.js";
 import { DisconnectLobbyPayloadSchema } from "../../server/socketValidation.js";
 import { emitLobbyList, getConnectedPlayerBySocket, removeConnectedPlayerFromLobby } from "./eventUtils.js";
@@ -28,7 +29,12 @@ export function onLobbyDisconnect(socket:Socket, io:Server, payload?:ILeaveLobby
     const game = serverMemory.games[targetLobbyId];
     if (game && game.status === "Active") {
         game.status = "Terminated";
-        io.to(targetLobbyId).emit("game-ended", { lobbyId: targetLobbyId, reason: "player-left" });
+        const reason = payload?.forfeit ? "player-forfeited" : "player-left";
+        logger.info(`Game ended due to ${reason}`, { 
+            lobbyId: targetLobbyId, 
+            gameId: game.id,
+        });
+        io.to(targetLobbyId).emit("game-ended", { lobbyId: targetLobbyId, reason });
     }
     delete serverMemory.games[targetLobbyId];
 

@@ -187,28 +187,58 @@ function LobbyDetail({ user, lobby, socketRef, onBack, onGameStart }: LobbyDetai
 			addLog(`❌ Server error: ${data.message}`);
 		};
 
+		const handleServerNotification = (data: { message: string; type: string }) => {
+			if (data.type === "reconnect") {
+				addLog(`🔵 ${data.message}`);
+			} else {
+				addLog(`ℹ️ ${data.message}`);
+			}
+		};
+
+		const handleConnect = () => {
+			addLog('🟢 Connected to server');
+		};
+
+		const handleDisconnect = (reason: string) => {
+			addLog(`🔴 Disconnected: ${reason}`);
+		};
+
 		socket.on("game-started", handleGameStart);
 		socket.on("ready-updated", handleReadyUpdated);
 		socket.on("lobby-list", handleLobbyList);
 		socket.on("server-error", handleError);
+		socket.on("server-notification", handleServerNotification);
+		socket.on("connect", handleConnect);
+		socket.on("disconnect", handleDisconnect);
 
 		return () => {
 			socket.off("game-started", handleGameStart);
 			socket.off("ready-updated", handleReadyUpdated);
 			socket.off("lobby-list", handleLobbyList);
 			socket.off("server-error", handleError);
+			socket.off("server-notification", handleServerNotification);
+			socket.off("connect", handleConnect);
+			socket.off("disconnect", handleDisconnect);
 		};
 	}, [socketRef, onGameStart]);
 
 	function handleReady() {
-		const newReadyStatus = !isReady;
-		setIsReady(newReadyStatus);
-		addLog(`📤 Sending ready: ${newReadyStatus}`);
-		socketRef.current?.emit("client-ready", { ready: newReadyStatus });
+		if (lobby.hasActiveGame) {
+			// Re-join active game - don't toggle ready, just emit game-action or trigger transition
+			addLog(`📤 Rejoining active game...`);
+			socketRef.current?.emit("join-lobby", { lobbyId: lobby.id });
+		} else {
+			// Normal ready toggle
+			const newReadyStatus = !isReady;
+			setIsReady(newReadyStatus);
+			addLog(`📤 Sending ready: ${newReadyStatus}`);
+			socketRef.current?.emit("client-ready", { ready: newReadyStatus });
+		}
 	}
 
 	function handleLeave() {
-		socketRef.current?.emit("disconnect-lobby", { lobbyId: lobby.id });
+		const forfeit = lobby.hasActiveGame;  // forfeit if active game
+		socketRef.current?.emit("disconnect-lobby", { lobbyId: lobby.id, forfeit });
 		onBack();
 	}
 
@@ -228,18 +258,31 @@ function LobbyDetail({ user, lobby, socketRef, onBack, onGameStart }: LobbyDetai
 						<div>
 							<h1 className="text-3xl font-bold">{lobby.name}</h1>
 							<p className="mt-2 text-sm text-zinc-400">Password: 12345</p>
+							{lobby.hasActiveGame && (
+								<p className="mt-2 text-sm font-semibold text-amber-400">⏸️ Game in progress - You can rejoin</p>
+							)}
 						</div>
-						<button
-							type="button"
-							onClick={handleReady}
-							className={`rounded-lg px-6 py-2 font-semibold transition-colors ${
-								isReady
-									? "border border-emerald-500 bg-emerald-900 text-emerald-100 hover:bg-emerald-800"
-									: "border border-emerald-400 bg-emerald-700 text-white hover:bg-emerald-600"
-							}`}
-						>
-							{isReady ? "Ready!" : "Ready"}
-						</button>
+						{lobby.hasActiveGame ? (
+							<button
+								type="button"
+								onClick={handleReady}
+								className="rounded-lg border border-emerald-400 bg-emerald-700 px-6 py-2 font-semibold text-white transition-colors hover:bg-emerald-600"
+							>
+								Re-Join Game
+							</button>
+						) : (
+							<button
+								type="button"
+								onClick={handleReady}
+								className={`rounded-lg px-6 py-2 font-semibold transition-colors ${
+									isReady
+										? "border border-emerald-500 bg-emerald-900 text-emerald-100 hover:bg-emerald-800"
+										: "border border-emerald-400 bg-emerald-700 text-white hover:bg-emerald-600"
+								}`}
+							>
+								{isReady ? "Ready!" : "Ready"}
+							</button>
+						)}
 					</div>
 
 					<div className="mt-6">
@@ -288,14 +331,18 @@ function LobbyDetail({ user, lobby, socketRef, onBack, onGameStart }: LobbyDetai
 						<button
 							type="button"
 							onClick={handleLeave}
-							className="flex-1 rounded-lg border border-zinc-600 bg-zinc-800 px-4 py-2 font-semibold text-zinc-300 transition-colors hover:bg-zinc-700"
-						>
-							Leave Lobby
-						</button>
-					</div>
+						className={`flex-1 rounded-lg px-4 py-2 font-semibold transition-colors ${
+							lobby.hasActiveGame
+								? "border border-red-600 bg-red-900 text-red-100 hover:bg-red-800"
+								: "border border-zinc-600 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+						}`}
+					>
+						{lobby.hasActiveGame ? "Forfeit Game" : "Leave Lobby"}
+					</button>
+				</div>
 
-					<div className="mt-4 max-h-40 overflow-y-auto rounded-lg border border-amber-900/60 bg-[rgba(3,7,18,0.8)] px-3 py-2 text-xs font-mono text-amber-100">
-						<div className="mb-1 text-amber-400/70">📋 Event Log:</div>
+				<div className="mt-4 max-h-40 overflow-y-auto rounded-lg border border-amber-900/60 bg-[rgba(3,7,18,0.8)] px-3 py-2 text-xs font-mono text-amber-100">
+					<div className="mb-1 text-amber-400/70">📋 Event Log:</div>
 						{logs.length === 0 ? (
 							<p className="text-amber-900/60">Waiting for events...</p>
 						) : (

@@ -37,7 +37,6 @@ function startLobbyGame(io, lobbyId) {
         };
     })
         .filter((player) => !!player);
-    logger.debug(`startLobbyGame: mapped to ${gamePlayers.length} game players`, { lobbyId });
     if (gamePlayers.length < 2) {
         logger.warn(`startLobbyGame: not enough game players`, { lobbyId, playerCount: gamePlayers.length });
         return;

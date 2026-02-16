@@ -3,6 +3,7 @@ import { logger } from "../../server/logger.js";
 import { validatePayload } from "../../server/validatePayload.js";
 import { JoinLobbyPayloadSchema } from "../../server/socketValidation.js";
 import { emitLobbyList, getConnectedPlayerBySocket, removeConnectedPlayerFromLobby } from "./eventUtils.js";
+import { emitGameStateToSocket } from "./gameState.js";
 export function onLobbyJoin(socket, io, payload) {
     if (!validatePayload(socket, payload, JoinLobbyPayloadSchema, 'join-lobby')) {
         return;
@@ -46,12 +47,28 @@ export function onLobbyJoin(socket, io, payload) {
         playerId: connectedPlayer.playerId,
         socketId: socket.id,
         ready: false,
+        isConnected: true,
     };
     connectedPlayer.lobbyId = lobby.id;
     connectedPlayer.socketId = socket.id;
     socket.join(lobby.id);
     logger.info(`Player joined lobby`, { playerId: connectedPlayer.playerId, lobbyId: lobby.id, playerCount: Object.keys(lobby.players).length });
     socket.emit("lobby-joined", { lobbyId: lobby.id });
-    socket.emit("ready-updated", { ready: false });
+    // Check if there's an active game for this lobby
+    const existingGame = serverMemory.games[lobby.id];
+    if (existingGame && existingGame.status === "Active") {
+        logger.info(`Player joined lobby with active game, auto-transitioning`, {
+            playerId: connectedPlayer.playerId,
+            lobbyId: lobby.id,
+            gameId: existingGame.id,
+        });
+        // Emit game-started to skip lobby screens and go directly to game
+        socket.emit("game-started", { lobbyId: lobby.id, gameId: existingGame.id });
+        // Send game state
+        emitGameStateToSocket(socket, lobby.id, connectedPlayer.playerId);
+    }
+    else {
+        socket.emit("ready-updated", { ready: false });
+    }
     emitLobbyList(io);
 }
