@@ -5,6 +5,7 @@ import type { IClientHand } from "@/schema/shared/IClientHand.js";
 import type { IClientPlayer } from "@/schema/shared/IClientPlayer.js";
 import { Game } from "../../engine/Game.js";
 import { serverMemory } from "../../server/serverMemory.js";
+import { logger } from "../../server/logger.js";
 import type { Server, Socket } from "socket.io";
 
 function toClientCard(card: ICard): IClientCard {
@@ -52,19 +53,31 @@ export function emitGameStateToLobby(io: Server, lobbyId: string) {
     const game = serverMemory.games[lobbyId];
     const lobby = serverMemory.lobbies[lobbyId];
     if (!(game instanceof Game) || !lobby) {
+        logger.warn(`emitGameStateToLobby: game or lobby not found`, { lobbyId, hasGame: game ? 'yes' : 'no', hasLobby: lobby ? 'yes' : 'no' });
         return;
     }
 
-    Object.values(lobby.players).forEach((lobbyPlayer) => {
+    const lobbyPlayers = Object.values(lobby.players);
+    logger.debug(`emitGameStateToLobby: emitting to ${lobbyPlayers.length} lobby players`, { lobbyId, gameId: game.id });
+
+    lobbyPlayers.forEach((lobbyPlayer) => {
         const targetSocket = io.sockets.sockets.get(lobbyPlayer.socketId);
         if (!targetSocket) {
+            logger.warn(`emitGameStateToLobby: socket not found`, { lobbyId, playerId: lobbyPlayer.playerId, socketId: lobbyPlayer.socketId });
+            console.log(`[emitGameStateToLobby] Socket not found for ${lobbyPlayer.socketId}, available sockets:`, Array.from(io.sockets.sockets.keys()));
             return;
         }
 
+        logger.debug(`emitGameStateToLobby: emitting to player`, { lobbyId, playerId: lobbyPlayer.playerId, socketId: lobbyPlayer.socketId });
+        console.log(`[emitGameStateToLobby] Emitting game-state to socket ${lobbyPlayer.socketId}`);
+        
+        const clientGame = toClientGame(game, lobbyPlayer.playerId);
         targetSocket.emit("game-state", {
             lobbyId,
-            game: toClientGame(game, lobbyPlayer.playerId),
+            game: clientGame,
         });
+        
+        console.log(`[emitGameStateToLobby] Emitted game-state for player ${lobbyPlayer.playerId}`);
     });
 }
 

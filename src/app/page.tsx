@@ -15,6 +15,7 @@ export default function Home() {
 	const initializedRef = useRef(false);
 
 	async function login(loginValue: string) {
+		console.log(`[LOGIN] Attempting login as: ${loginValue}`);
 		const response = await fetch("/api/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -26,8 +27,10 @@ export default function Home() {
 			return;
 		}
 
+		const userData = await response.json();
+		console.log(`[LOGIN] Success: ${userData.id} (${userData.nickname})`);
 		setError(undefined);
-		setUser(await response.json());
+		setUser(userData);
 	}
 
 	// Initialize socket connection ONCE on mount, then connect as users join

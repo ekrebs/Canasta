@@ -1,6 +1,11 @@
 import { serverMemory } from "../../server/serverMemory.js";
+import { validatePayload } from "../../server/validatePayload.js";
+import { DisconnectLobbyPayloadSchema } from "../../server/socketValidation.js";
 import { emitLobbyList, getConnectedPlayerBySocket, removeConnectedPlayerFromLobby } from "./eventUtils.js";
 export function onLobbyDisconnect(socket, io, payload) {
+    if (payload && !validatePayload(socket, payload, DisconnectLobbyPayloadSchema, 'disconnect-lobby')) {
+        return;
+    }
     const connectedPlayer = getConnectedPlayerBySocket(socket.id);
     if (!connectedPlayer) {
         return;

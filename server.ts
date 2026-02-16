@@ -25,6 +25,12 @@ async function main() {
 
 	io.on("connection", (socket) => {
 		console.log(`New socket connection: ${socket.id}`);
+		
+		// Log all received events using onAny middleware
+		socket.onAny((event, ...args) => {
+			console.log(`[EVENT] ${socket.id} → ${event}`, args.length > 0 ? JSON.stringify(args[0]).slice(0, 100) : '');
+		});
+		
 		handleConnection(socket, io);
 	});
 

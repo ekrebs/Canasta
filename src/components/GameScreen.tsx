@@ -71,45 +71,92 @@ const seatTemplates: SeatTemplate[] = [
 export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 	const [game, setGame] = useState<IClientGame | undefined>(undefined);
 	const [error, setError] = useState<string | undefined>(undefined);
+	const [logs, setLogs] = useState<Array<{ timestamp: string; message: string }>>([]);
+
+	const addLog = (message: string) => {
+		const now = new Date();
+		const timestamp = now.toLocaleTimeString('en-US', { 
+			hour: '2-digit', 
+			minute: '2-digit', 
+			second: '2-digit',
+			hour12: false 
+		});
+		setLogs((prev) => [...prev.slice(-19), { timestamp, message }]);
+	};
 
 	useEffect(() => {
 		const socket = socketRef.current;
-		if (!socket) return;
+		if (!socket) {
+			addLog('⚠️ No socket connection');
+			return;
+		}
+
+		addLog('🔌 Socket handler attached');
+		console.log(`[GameScreen] Socket attached: ${socket.id}, connected: ${socket.connected}`);
 
 		const handleGameState = (data: GameStateEvent) => {
+			console.log(`[GameScreen] Received game-state:`, data);
+			addLog(`📡 Game state: ${data.game.status}, phase: ${data.game.turnPhase}, myId: ${data.game.hand.playerId.slice(0, 8)}, activeId: ${data.game.activePlayerId.slice(0, 8)}`);
 			setGame(data.game);
 			setError(undefined);
 		};
 
+		const handleGameStarted = (data: { lobbyId: string; gameId: string }) => {
+			console.log(`[GameScreen] Game started:`, data);
+			addLog(`🎮 Game started: ${data.gameId.slice(0, 8)}`);
+		};
+
 		const handleGameEnded = () => {
+			console.log(`[GameScreen] Game ended`);
+			addLog('🏁 Game ended');
 			setGame(undefined);
 			onGameEnd();
 		};
 
 		const handleGameComplete = () => {
+			console.log(`[GameScreen] Game complete`);
+			addLog('✅ Game complete');
 			onGameEnd();
 		};
 
 		const handleError = (data: ServerErrorEvent) => {
+			console.log(`[GameScreen] Server error:`, data);
+			addLog(`❌ Server error: ${data.message}`);
 			setError(data.message);
 		};
 
-		const handleDisconnect = () => {
+		const handleDisconnect = (reason: string) => {
+			console.log(`[GameScreen] Disconnected:`, reason);
+			addLog(`🔴 Disconnected: ${reason}`);
 			onGameEnd();
 		};
 
+		const handleConnect = () => {
+			console.log(`[GameScreen] Connected`);
+			addLog('🟢 Connected to server');
+		};
+
+		console.log(`[GameScreen] Registering event listeners`);
 		socket.on("game-state", handleGameState);
+		socket.on("game-started", handleGameStarted);
 		socket.on("game-ended", handleGameEnded);
 		socket.on("game-complete", handleGameComplete);
 		socket.on("server-error", handleError);
 		socket.on("disconnect", handleDisconnect);
+		socket.on("connect", handleConnect);
+
+		// Request current game state in case we missed the initial emit
+		socket.emit("get-game-state");
+		console.log(`[GameScreen] Requested current game state`);
 
 		return () => {
 			socket.off("game-state", handleGameState);
+			socket.off("game-started", handleGameStarted);
 			socket.off("game-ended", handleGameEnded);
 			socket.off("game-complete", handleGameComplete);
 			socket.off("server-error", handleError);
 			socket.off("disconnect", handleDisconnect);
+			socket.off("connect", handleConnect);
 		};
 	}, [socketRef, onGameEnd]);
 
@@ -158,14 +205,25 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 					<span className="h-1 w-8 rounded bg-zinc-100" />
 					<span className="h-1 w-8 rounded bg-zinc-100" />
 				</button>
-				<div className="flex items-center gap-2 sm:gap-3">
-					<Avatar src="/avatars/Avatar6.png" alt={user.nickname} />
-					<div className="flex items-center gap-2">
-						<div className="min-w-20 rounded-lg bg-[#014113] px-3 py-1 text-center text-lg leading-tight sm:min-w-28 sm:text-2xl">
-							{user.nickname}
+				<div className="flex flex-col items-end gap-2">
+					<div className="flex items-center gap-2 sm:gap-3">
+						<Avatar src="/avatars/Avatar6.png" alt={user.nickname} />
+						<div className="flex items-center gap-2">
+							<div className="min-w-20 rounded-lg bg-[#014113] px-3 py-1 text-center text-lg leading-tight sm:min-w-28 sm:text-2xl">
+								{user.nickname}
+							</div>
+							<div className="text-2xl font-medium sm:text-4xl">{formatScore(1595)}</div>
 						</div>
-						<div className="text-2xl font-medium sm:text-4xl">{formatScore(1595)}</div>
 					</div>
+					{game && game.status === "Active" && (
+						<div className={`rounded-lg px-3 py-1 text-sm font-semibold transition-colors ${
+							isMyTurn 
+								? "bg-yellow-500/80 text-yellow-900" 
+								: "bg-yellow-900/40 text-yellow-100"
+						}`}>
+							{isMyTurn ? "🚀 Your Turn!" : "⏳ Other player's turn"}
+						</div>
+					)}
 				</div>
 			</header>
 
@@ -195,7 +253,11 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 					<div className="flex gap-2">
 						<button
 							type="button"
-							className="h-10 min-w-24 rounded-lg border border-emerald-100 bg-[#15461e] px-3 text-sm sm:text-base disabled:cursor-not-allowed disabled:opacity-40"
+							className={`h-10 min-w-24 rounded-lg border px-3 text-sm font-semibold sm:text-base transition-all ${
+								canDraw
+									? "border-green-300 bg-green-700 hover:bg-green-600 cursor-pointer text-white"
+									: "border-gray-600 bg-gray-700 cursor-not-allowed opacity-50 text-gray-400"
+							}`}
 							disabled={!canDraw}
 							onClick={() => sendGameAction({ action: "draw-stock" })}
 						>
@@ -203,7 +265,11 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 						</button>
 						<button
 							type="button"
-							className="h-10 min-w-24 rounded-lg border border-emerald-100 bg-[#15461e] px-3 text-sm sm:text-base disabled:cursor-not-allowed disabled:opacity-40"
+							className={`h-10 min-w-24 rounded-lg border px-3 text-sm font-semibold sm:text-base transition-all ${
+								canEndTurn
+									? "border-yellow-300 bg-yellow-600 hover:bg-yellow-500 cursor-pointer text-white"
+									: "border-gray-600 bg-gray-700 cursor-not-allowed opacity-50 text-gray-400"
+							}`}
 							disabled={!canEndTurn}
 							onClick={() => sendGameAction({ action: "end-turn" })}
 						>
@@ -224,11 +290,25 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 				/>
 			)}
 
-			<footer className="mt-2 rounded-lg border border-emerald-200/40 bg-[rgba(7,40,15,0.64)] px-3 py-2 text-sm">
-				<p>Game: {game?.status ?? "Waiting"}</p>
-				<p>Phase: {game?.turnPhase ?? "draw"}</p>
-				<p>{isMyTurn ? "Your turn" : "Waiting for other player"}</p>
+			<footer className="mt-2 rounded-lg border border-emerald-200/40 bg-[rgba(7,40,15,0.64)] px-3 py-2 text-xs sm:text-sm font-mono">
+				<p>Game: {game?.status ?? "Waiting for game state..."}</p>
+				<p>Phase: {game?.turnPhase ?? "—"} | Active Player: {game?.activePlayerId?.slice(0, 8) ?? "—"}...</p>
+				<p>Your Player ID: {myPlayerId?.slice(0, 8) ?? "—"}... | {isMyTurn ? "✅ Your turn" : "⏳ Their turn"}</p>
 			</footer>
+
+			<div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-amber-900/60 bg-[rgba(3,7,18,0.8)] px-3 py-2 text-xs font-mono text-amber-100">
+				<div className="mb-1 text-amber-400/70">📋 Event Log:</div>
+				{logs.length === 0 ? (
+					<p className="text-amber-900/60">Waiting for events...</p>
+				) : (
+					logs.map((log, index) => (
+						<div key={index} className="flex gap-2 text-amber-100">
+							<span className="inline-block min-w-16 text-amber-400">{log.timestamp}</span>
+							<span>{log.message}</span>
+						</div>
+					))
+				)}
+			</div>
 		</div>
 	);
 }

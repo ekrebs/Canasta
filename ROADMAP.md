@@ -165,3 +165,14 @@ Done when:
 
 - 2026-02-14: Initial roadmap created from architecture review and planning session.
 - 2026-02-14: Phase 0 implementation started. Added authoritative lobby join/leave/ready and game action loop (`draw-stock`, `discard`, `end-turn`) over Socket.IO, plus client controls to drive the loop with mock users.
+- 2026-02-16: Phase 0 → Phase 1 transition started.
+  - ✅ Installed Vitest test framework
+  - ✅ Created Game engine unit tests (25 passing)
+  - ✅ Created socket integration test scaffold
+  - ✅ Implemented structured logging utility with context tracking
+  - ✅ Updated all socket event handlers to use logger
+  - ✅ Installed Zod for payload validation
+  - ✅ Created Zod schemas for all socket payloads (incoming + outgoing)
+  - ✅ Added validatePayload utility with proper error handling
+  - ✅ Integrated payload validation into all socket event handlers
+  - 🏗️ Next: Debug draw/discard/end-turn actions in gameplay, add reconnect recovery

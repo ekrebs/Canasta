@@ -1,9 +1,10 @@
 import { serverMemory } from "../../server/serverMemory.js";
+import { logger } from "../../server/logger.js";
 import { v4 } from "uuid";
 import { emitGameStateToSocket } from "./gameState.js";
 import { emitLobbyListToSocket } from "./eventUtils.js";
 export function onServerJoin(socket, _io, user) {
-    console.log(`Player ${user.login} joined the server.`);
+    logger.info(`Player joined server`, { userId: user.id, socketId: socket.id, login: user.login });
     const existingPlayer = serverMemory.connectedPlayers[user.id];
     serverMemory.connectedPlayers[user.id] = {
         playerId: existingPlayer?.playerId ?? v4(),

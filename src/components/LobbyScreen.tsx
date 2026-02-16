@@ -148,25 +148,63 @@ type LobbyDetailProps = {
 
 function LobbyDetail({ user, lobby, socketRef, onBack, onGameStart }: LobbyDetailProps) {
 	const [isReady, setIsReady] = useState(false);
+	const [logs, setLogs] = useState<Array<{ timestamp: string; message: string }>>([]);
+
+	const addLog = (message: string) => {
+		const now = new Date();
+		const timestamp = now.toLocaleTimeString('en-US', { 
+			hour: '2-digit', 
+			minute: '2-digit', 
+			second: '2-digit',
+			hour12: false 
+		});
+		setLogs((prev) => [...prev.slice(-19), { timestamp, message }]);
+	};
 
 	useEffect(() => {
 		const socket = socketRef.current;
-		if (!socket) return;
+		if (!socket) {
+			addLog('⚠️ No socket connection');
+			return;
+		}
+
+		addLog('🔌 Socket handler attached');
 
 		const handleGameStart = () => {
+			addLog('🎮 Game started - transitioning to game screen');
 			onGameStart();
 		};
 
-		socket.on("game-state", handleGameStart);
+		const handleReadyUpdated = (data: { ready: boolean }) => {
+			addLog(`${data.ready ? '✅' : '⏸️'} Your ready status: ${data.ready}`);
+		};
+
+		const handleLobbyList = () => {
+			addLog('📋 Lobby list updated');
+		};
+
+		const handleError = (data: ServerErrorEvent) => {
+			addLog(`❌ Server error: ${data.message}`);
+		};
+
+		socket.on("game-started", handleGameStart);
+		socket.on("ready-updated", handleReadyUpdated);
+		socket.on("lobby-list", handleLobbyList);
+		socket.on("server-error", handleError);
 
 		return () => {
-			socket.off("game-state", handleGameStart);
+			socket.off("game-started", handleGameStart);
+			socket.off("ready-updated", handleReadyUpdated);
+			socket.off("lobby-list", handleLobbyList);
+			socket.off("server-error", handleError);
 		};
 	}, [socketRef, onGameStart]);
 
 	function handleReady() {
-		setIsReady(!isReady);
-		socketRef.current?.emit("client-ready", { ready: !isReady });
+		const newReadyStatus = !isReady;
+		setIsReady(newReadyStatus);
+		addLog(`📤 Sending ready: ${newReadyStatus}`);
+		socketRef.current?.emit("client-ready", { ready: newReadyStatus });
 	}
 
 	function handleLeave() {
@@ -254,6 +292,20 @@ function LobbyDetail({ user, lobby, socketRef, onBack, onGameStart }: LobbyDetai
 						>
 							Leave Lobby
 						</button>
+					</div>
+
+					<div className="mt-4 max-h-40 overflow-y-auto rounded-lg border border-amber-900/60 bg-[rgba(3,7,18,0.8)] px-3 py-2 text-xs font-mono text-amber-100">
+						<div className="mb-1 text-amber-400/70">📋 Event Log:</div>
+						{logs.length === 0 ? (
+							<p className="text-amber-900/60">Waiting for events...</p>
+						) : (
+							logs.map((log, index) => (
+								<div key={index} className="flex gap-2 text-amber-100">
+									<span className="inline-block min-w-16 text-amber-400">{log.timestamp}</span>
+									<span>{log.message}</span>
+								</div>
+							))
+						)}
 					</div>
 				</div>
 			</div>

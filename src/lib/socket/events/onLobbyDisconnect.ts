@@ -1,9 +1,15 @@
 import type { ILeaveLobbyPayload } from "../../../schema/shared/ISocketPayloads.js";
 import { Server, Socket } from "socket.io";
 import { serverMemory } from "../../server/serverMemory.js";
+import { validatePayload } from "../../server/validatePayload.js";
+import { DisconnectLobbyPayloadSchema } from "../../server/socketValidation.js";
 import { emitLobbyList, getConnectedPlayerBySocket, removeConnectedPlayerFromLobby } from "./eventUtils.js";
 
 export function onLobbyDisconnect(socket:Socket, io:Server, payload?:ILeaveLobbyPayload ) {
+    if (payload && !validatePayload(socket, payload, DisconnectLobbyPayloadSchema, 'disconnect-lobby')) {
+        return;
+    }
+
     const connectedPlayer = getConnectedPlayerBySocket(socket.id);
     if (!connectedPlayer) {
         return;
