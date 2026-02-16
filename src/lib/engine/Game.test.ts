@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { v4 as uuidv4 } from 'uuid';
 import { Game } from './Game.js';
+import { Deck } from './Deck.js';
+import { PlayerHand } from './PlayerHand.js';
 import type { IPlayer } from '@/schema/server/IPlayer.js';
 
 describe('Game Engine', () => {
@@ -256,6 +259,128 @@ describe('Game Engine', () => {
 			const activePlayerId = game.activePlayer!.id;
 			game.drawStock(activePlayerId);
 			expect(() => game.discard(activePlayerId, 'invalid-card-id')).toThrow();
+		});
+	});
+
+	describe('Replay Determinism', () => {
+		it('should produce identical final state when replaying recorded actions', () => {
+			// Play first game and record actions
+			game.start();
+
+			interface GameAction {
+				playerId: string;
+				action: 'draw' | 'discard' | 'endTurn';
+				cardId?: string;
+			}
+			const recordedActions: GameAction[] = [];
+
+			// Helper function to capture game snapshot
+			const captureSnapshot = (g: Game) => ({
+				status: g.status,
+				turnPhase: g.turnPhase,
+				dealerId: g.dealer!.id,
+				stockCards: g.stock.cards.map((c) => ({ ...c })),
+				pileCards: g.pile.cards.map((c) => ({ ...c })),
+				handCards: g.hands.map((h) => ({
+					playerId: h.player.id,
+					cards: h.cards.map((c) => ({ ...c })),
+				})),
+				activePlayerId: g.activePlayer!.id,
+			});
+
+			const initialSnapshot = captureSnapshot(game);
+
+			// Play several turns and record actions
+			for (let turn = 0; turn < 3; turn++) {
+				const activePlayerId = game.activePlayer!.id;
+
+				// Draw
+				game.drawStock(activePlayerId);
+				recordedActions.push({ playerId: activePlayerId, action: 'draw' });
+
+				// Discard
+				const hand = game.getHandByPlayerId(activePlayerId);
+				const cardToDiscard = hand.cards[0];
+				game.discard(activePlayerId, cardToDiscard.id);
+				recordedActions.push({
+					playerId: activePlayerId,
+					action: 'discard',
+					cardId: cardToDiscard.id,
+				});
+
+				// End Turn
+				game.endTurn(activePlayerId);
+				recordedActions.push({ playerId: activePlayerId, action: 'endTurn' });
+			}
+
+			// Capture final state from original game
+			const originalFinalSnapshot = captureSnapshot(game);
+
+			// Create second game and restore to exact same initial state
+			const game2 = new Game(players);
+			game2.start();
+
+			// Restore exact initial state: dealer, stock, pile, hands from recorded snapshot
+			game2.dealer = game2.players.find((p) => p.id === initialSnapshot.dealerId);
+			game2.stock.cards = initialSnapshot.stockCards.map((card) => ({ ...card }));
+			game2.pile.cards = initialSnapshot.pileCards.map((card) => ({ ...card }));
+
+			// Clear and restore hands with exact card copies
+			game2.hands = initialSnapshot.handCards.map((handSnapshot) => {
+				const player = game2.players.find((p) => p.id === handSnapshot.playerId)!;
+				const hand = new PlayerHand(player);
+				hand.cards = handSnapshot.cards.map((card) => ({ ...card }));
+				return hand;
+			});
+
+			// Set active player and turn to match initial state
+			game2.activePlayer = game2.players.find(
+				(p) => p.id === initialSnapshot.activePlayerId
+			);
+			game2.turnPhase = initialSnapshot.turnPhase;
+			game2.turn = {
+				id: uuidv4(),
+				player: game2.activePlayer!,
+				startTime: new Date().toISOString(),
+			};
+
+			// Replay all recorded actions
+			recordedActions.forEach((action) => {
+				if (action.action === 'draw') {
+					game2.drawStock(action.playerId);
+				} else if (action.action === 'discard') {
+					game2.discard(action.playerId, action.cardId!);
+				} else if (action.action === 'endTurn') {
+					game2.endTurn(action.playerId);
+				}
+			});
+
+			// Verify final state matches exactly
+			const game2FinalSnapshot = captureSnapshot(game2);
+
+			expect(game2.status).toBe(originalFinalSnapshot.status);
+			expect(game2.turnPhase).toBe(originalFinalSnapshot.turnPhase);
+			expect(game2.stock.cards.length).toBe(originalFinalSnapshot.stockCards.length);
+			expect(game2.pile.cards.length).toBe(originalFinalSnapshot.pileCards.length);
+			expect(game2.activePlayer!.id).toBe(originalFinalSnapshot.activePlayerId);
+
+			// Verify hand states match card by card
+			game2.hands.forEach((hand, index) => {
+				const originalHand = originalFinalSnapshot.handCards[index];
+				expect(hand.cards.length).toBe(originalHand.cards.length);
+
+				// Verify card IDs and order match exactly
+				hand.cards.forEach((card, cardIndex) => {
+					expect(card.id).toBe(originalHand.cards[cardIndex].id);
+					expect(card.suit).toBe(originalHand.cards[cardIndex].suit);
+					expect(card.rank).toBe(originalHand.cards[cardIndex].rank);
+				});
+			});
+
+			// Verify pile cards match
+			game2.pile.cards.forEach((card, index) => {
+				expect(card.id).toBe(originalFinalSnapshot.pileCards[index].id);
+			});
 		});
 	});
 });
