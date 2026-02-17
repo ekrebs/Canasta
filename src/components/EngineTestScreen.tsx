@@ -1,11 +1,25 @@
 'use client';
 
-import { useMemo, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
-import { Game } from "@/lib/engine/Game";
-import type { IPlayer } from "@/schema/server/IPlayer";
+import { useMemo, useState, useCallback } from "react";
 import type { ICard } from "@/schema/server/ICard";
 import type { IMeld } from "@/schema/server/IMeld";
+
+type GameState = {
+	status: string;
+	turnPhase: string;
+	activePlayerId: string;
+	players: any[];
+	playerBoards: any[];
+	discardPile: ICard[];
+	stock: { count: number };
+	scores: any[];
+	gameLog: string[];
+};
+
+type MeldTarget = {
+	type: "add" | "new";
+	rank: string;
+};
 
 const rankOrder = ["W", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"] as const;
 
@@ -67,417 +81,277 @@ function canAddToMeld(meld: IMeld, cards: ICard[]): boolean {
 }
 
 function getMeldTarget(boardMelds: IMeld[], cards: ICard[]): MeldTarget | null {
-    for (const meld of boardMelds) {
-        if (canAddToMeld(meld, cards)) {
-            return { type: "add", rank: meld.rank };
-        }
-    }
+	for (const meld of boardMelds) {
+		if (canAddToMeld(meld, cards)) {
+			return { type: "add", rank: meld.rank };
+		}
+	}
 
-    if (canFormMeld(cards)) {
-        const naturalCard = cards.find((card) => !isWildCard(card));
-        if (!naturalCard) return null;
-        return { type: "new", rank: naturalCard.rank };
-    }
+	if (canFormMeld(cards)) {
+		const naturalCard = cards.find((card) => !isWildCard(card));
+		if (!naturalCard) return null;
+		return { type: "new", rank: naturalCard.rank };
+	}
 
-    return null;
-}
-
-function getTeamKey(game: Game, playerId: string): string {
-    const player = game.players.find((p) => p.id === playerId);
-    if (!player) return playerId;
-    const team = game.teams.find((t) => t.players.includes(player));
-    return team?.id ?? playerId;
-}
-
-function getInitialMeldMinimum(teamScore: number): number {
-    if (teamScore < 0) return 15;
-    if (teamScore <= 1495) return 50;
-    if (teamScore <= 2995) return 90;
-    return 120;
-}
-
-function getTeamScore(game: Game, playerId: string): number {
-    const player = game.players.find((p) => p.id === playerId);
-    if (!player) return 0;
-    const team = game.teams.find((t) => t.players.includes(player));
-    if (!team) {
-        return game.calculatePlayerScore(playerId);
-    }
-    return team.players.reduce((total, member) => total + game.calculatePlayerScore(member.id), 0);
+	return null;
 }
 
 export function EngineTestScreen() {
-    const [game, setGame] = useState<Game | null>(null);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [tick, setTick] = useState(0);
-    const [error, setError] = useState<string | null>(null);
+	const [gameState, setGameState] = useState<GameState | null>(null);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+	const [error, setError] = useState<string | null>(null);
 
-    const activePlayerId = game?.activePlayer?.id;
+	const activePlayerId = gameState?.activePlayerId;
+	const activeBoard = activePlayerId && gameState ? gameState.playerBoards.find((b: any) => b.playerId === activePlayerId) : null;
 
-    const activeBoard = activePlayerId && game ? game.getPlayerBoard(activePlayerId) : null;
+	const selectedCards = useMemo(() => {
+		if (!activeBoard) return [] as ICard[];
+		return activeBoard.hand.filter((card: ICard) => selectedIds.has(card.id));
+	}, [activeBoard, selectedIds]);
 
-    const selectedCards = useMemo(() => {
-        if (!game || !activeBoard) return [] as ICard[];
-        const ids = selectedIds;
-        return activeBoard.hand.cards.filter((card) => ids.has(card.id));
-    }, [game, activeBoard, selectedIds, tick]);
+	const meldTarget = activeBoard ? getMeldTarget(activeBoard.melds, selectedCards) : null;
 
-    const meldTarget = activeBoard ? getMeldTarget(activeBoard.melds, selectedCards) : null;
+	const canDiscard = !!gameState && !!activeBoard && gameState.turnPhase === "discard" && selectedIds.size === 1;
+	const canDraw = !!gameState && !!activeBoard && gameState.turnPhase === "draw";
+	const canEndTurn = !!gameState && !!activeBoard && gameState.turnPhase === "complete-turn";
+	const canMeld = !!gameState && !!activeBoard && selectedCards.length > 0 && !!meldTarget;
 
-    const canDiscard = !!game && !!activeBoard && game.turnPhase === "discard" && selectedIds.size === 1;
-    const canDraw = !!game && !!activeBoard && game.turnPhase === "draw";
-    const canEndTurn = !!game && !!activeBoard && game.turnPhase === "complete-turn";
-    const canMeld = !!game && !!activeBoard && selectedCards.length > 0 && !!meldTarget;
+	const canGoOut = !!gameState && !!activeBoard && activeBoard.canastas.length > 0 && activeBoard.hand.length <= 1;
 
-    const canGoOut = !!game && !!activeBoard && activeBoard.canastas.length > 0 && activeBoard.hand.cards.length <= 1;
+	const pileTop = gameState?.discardPile[gameState.discardPile.length - 1];
 
-    const pileTop = game?.pile.cards[game.pile.cards.length - 1];
+	const canPickupDiscard = useMemo(() => {
+		if (!gameState || !activeBoard) return false;
+		if (gameState.turnPhase !== "draw") return false;
+		if (!pileTop) return false;
+		const selectionWithTop = [...selectedCards, pileTop];
+		return !!getMeldTarget(activeBoard.melds, selectionWithTop);
+	}, [gameState, activeBoard, selectedCards, pileTop]);
 
-    const canPickupDiscard = useMemo(() => {
-        if (!game || !activeBoard) return false;
-        if (game.turnPhase !== "draw") return false;
-        if (!pileTop) return false;
-        const selectionWithTop = [...selectedCards, pileTop];
-        return !!getMeldTarget(activeBoard.melds, selectionWithTop);
-    }, [game, activeBoard, selectedCards, pileTop]);
+	const callApi = useCallback(async (action: string, payload: any = {}) => {
+		try {
+			const res = await fetch("/api/engine-test", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action, payload }),
+			});
+			const data = await res.json();
+			if (!data.success) {
+				setError(data.error);
+				return;
+			}
+			setGameState(data.game);
+			setError(null);
+		} catch (err) {
+			setError(String(err));
+		}
+	}, []);
 
-    const handleStartGame = () => {
-        const players: IPlayer[] = playerNames.map((name, index) => ({
-            id: uuidv4(),
-            index,
-            profile: {
-                id: uuidv4(),
-                handle: name,
-                avatar: "",
-            },
-            isBot: false,
-        }));
-        const newGame = new Game(players);
-        newGame.start();
-        setGame(newGame);
-        setSelectedIds(new Set());
-        setError(null);
-        setTick((prev) => prev + 1);
-    };
+	const handleStartGame = useCallback(() => {
+		callApi("start");
+	}, [callApi]);
 
-    const toggleSelect = (cardId: string) => {
-        if (!activeBoard) return;
-        const next = new Set(selectedIds);
-        if (next.has(cardId)) {
-            next.delete(cardId);
-        } else {
-            next.add(cardId);
-        }
-        setSelectedIds(next);
-    };
+	const handleDraw = useCallback(() => {
+		if (!activePlayerId) return;
+		callApi("draw-stock", { playerId: activePlayerId });
+	}, [activePlayerId, callApi]);
 
-    const handleDraw = () => {
-        if (!game || !activePlayerId) return;
-        try {
-            game.drawStock(activePlayerId);
-            setSelectedIds(new Set());
-            setError(null);
-            setTick((prev) => prev + 1);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Unable to draw.";
-            setError(message);
-        }
-    };
+	const handleDiscard = useCallback(() => {
+		if (!activePlayerId || selectedIds.size !== 1) return;
+		const cardId = Array.from(selectedIds)[0];
+		callApi("discard", { playerId: activePlayerId, cardId });
+		setSelectedIds(new Set());
+	}, [activePlayerId, selectedIds, callApi]);
 
-    const handleDiscard = () => {
-        if (!game || !activePlayerId) return;
-        const [cardId] = Array.from(selectedIds);
-        if (!cardId) return;
-        try {
-            game.discard(activePlayerId, cardId);
-            setSelectedIds(new Set());
-            setError(null);
-            setTick((prev) => prev + 1);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Unable to discard.";
-            setError(message);
-        }
-    };
+	const handleEndTurn = useCallback(() => {
+		if (!activePlayerId) return;
+		callApi("end-turn", { playerId: activePlayerId });
+		setSelectedIds(new Set());
+	}, [activePlayerId, callApi]);
 
-    const handleEndTurn = () => {
-        if (!game || !activePlayerId) return;
-        try {
-            game.endTurn(activePlayerId);
-            setSelectedIds(new Set());
-            setError(null);
-            setTick((prev) => prev + 1);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Unable to end turn.";
-            setError(message);
-        }
-    };
+	const handleMeld = useCallback(() => {
+		if (!activePlayerId || !meldTarget) return;
+		const cardIds = selectedCards.map((c) => c.id);
+		if (meldTarget.type === "new") {
+			callApi("play-meld", { playerId: activePlayerId, cardIds });
+		} else {
+			callApi("add-to-meld", { playerId: activePlayerId, meldRank: meldTarget.rank, cardIds });
+		}
+		setSelectedIds(new Set());
+	}, [activePlayerId, meldTarget, selectedCards, callApi]);
 
-    const handleMeld = () => {
-        if (!game || !activePlayerId || !activeBoard || !meldTarget) return;
-        if (selectedCards.length === activeBoard.hand.cards.length && !canGoOut) {
-            setError("Cannot meld final card without meeting go out requirements.");
-            return;
-        }
-        try {
-            if (meldTarget.type === "add") {
-                game.addToMeld(activePlayerId, meldTarget.rank, selectedCards.map((card) => card.id));
-            } else {
-                game.playMeld(activePlayerId, selectedCards.map((card) => card.id));
-            }
-            if (activeBoard.hand.cards.length === 0 && canGoOut) {
-                game.status = "Complete";
-                game.winnerPlayerId = activePlayerId;
-            }
-            setSelectedIds(new Set());
-            setError(null);
-            setTick((prev) => prev + 1);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Unable to meld.";
-            setError(message);
-        }
-    };
+	const handleGoOut = useCallback(() => {
+		if (!activePlayerId) return;
+		callApi("go-out", { playerId: activePlayerId });
+	}, [activePlayerId, callApi]);
 
-    const handlePickupDiscard = () => {
-        if (!game || !activePlayerId || !activeBoard || !pileTop) return;
-        if (!canPickupDiscard) return;
-        const selectionWithTop = [...selectedCards, pileTop];
-        const target = getMeldTarget(activeBoard.melds, selectionWithTop);
-        if (!target) return;
+	const handlePickupDiscard = useCallback(() => {
+		if (!activePlayerId || !pileTop) return;
+		const cardIds = [...selectedCards, pileTop].map((c) => c.id);
+		callApi("add-to-meld", { playerId: activePlayerId, meldRank: pileTop.rank, cardIds });
+		setSelectedIds(new Set());
+	}, [activePlayerId, pileTop, selectedCards, callApi]);
 
-        const pileCards = [...game.pile.cards];
-        game.pile.cards = [];
-        activeBoard.hand.cards.push(...pileCards);
+	const toggleCardSelection = (cardId: string) => {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (next.has(cardId)) next.delete(cardId);
+			else next.add(cardId);
+			return next;
+		});
+	};
 
-        const internalGame = game as unknown as { openedTeams: Set<string> };
-        const teamKey = getTeamKey(game, activePlayerId);
-        if (!internalGame.openedTeams.has(teamKey)) {
-            internalGame.openedTeams.add(teamKey);
-        }
+	if (!gameState) {
+		return (
+			<div style={{ padding: "20px", textAlign: "center" }}>
+				<h1>Canasta Engine Test</h1>
+				<button onClick={handleStartGame} style={{ padding: "10px 20px", fontSize: "16px" }}>
+					Start Game
+				</button>
+				{error && <div style={{ color: "red", marginTop: "10px" }}>{error}</div>}
+			</div>
+		);
+	}
 
-        try {
-            const cardIds = selectionWithTop.map((card) => card.id);
-            if (target.type === "add") {
-                game.addToMeld(activePlayerId, target.rank, cardIds);
-            } else {
-                game.playMeld(activePlayerId, cardIds);
-            }
-            game.turnPhase = "discard";
-            setSelectedIds(new Set());
-            setError(null);
-            setTick((prev) => prev + 1);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Unable to pick up discard pile.";
-            setError(message);
-        }
-    };
+	return (
+		<div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+			<h1>Canasta Engine Test - {gameState.status}</h1>
 
-    const handleGoOut = () => {
-        if (!game || !activePlayerId || !activeBoard) return;
-        if (!canGoOut || activeBoard.hand.cards.length !== 1) {
-            setError("Go out requires one card left and a canasta.");
-            return;
-        }
-        try {
-            const cardId = activeBoard.hand.cards[0]?.id;
-            if (!cardId) return;
-            game.discard(activePlayerId, cardId);
-            setSelectedIds(new Set());
-            setError(null);
-            setTick((prev) => prev + 1);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Unable to go out.";
-            setError(message);
-        }
-    };
+			{error && <div style={{ color: "red", background: "#ffe0e0", padding: "10px", marginBottom: "10px" }}>{error}</div>}
 
-    const activeTeamScore = game && activePlayerId ? getTeamScore(game, activePlayerId) : 0;
-    const activeMinimum = getInitialMeldMinimum(activeTeamScore);
+			<div style={{ marginBottom: "20px" }}>
+				<h2>Game State</h2>
+				<p>
+					<strong>Turn Phase:</strong> {gameState.turnPhase}
+				</p>
+				<p>
+					<strong>Active Player:</strong> {gameState.players.find((p) => p.id === activePlayerId)?.name}
+				</p>
+				<p>
+					<strong>Stock Cards:</strong> {gameState.stock.count}
+				</p>
+				<p>
+					<strong>Discard Pile:</strong> {gameState.discardPile.length} cards
+					{pileTop ? ` (Top: ${formatCard(pileTop)})` : ""}
+				</p>
+			</div>
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-slate-50 to-emerald-100 px-4 py-6 text-slate-900">
-            <div className="mx-auto flex max-w-6xl flex-col gap-6">
-                <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                    <div>
-                        <h1 className="text-2xl font-semibold">Engine Test Table</h1>
-                        <p className="text-sm text-slate-600">Local engine sandbox for 4-player testing</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={handleStartGame}
-                            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
-                        >
-                            Start Game
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleDraw}
-                            disabled={!canDraw}
-                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Draw
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleDiscard}
-                            disabled={!canDiscard}
-                            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Discard
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleMeld}
-                            disabled={!canMeld}
-                            className="rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Meld
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleEndTurn}
-                            disabled={!canEndTurn}
-                            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            End Turn
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleGoOut}
-                            disabled={!canGoOut || !activeBoard || activeBoard.hand.cards.length !== 1}
-                            className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Go Out
-                        </button>
-                    </div>
-                </header>
+			<div style={{ marginBottom: "20px" }}>
+				<h2>Scores</h2>
+				{gameState.scores.map((score) => (
+					<p key={score.playerId}>
+						{gameState.players.find((p) => p.id === score.playerId)?.name}: {score.score}
+					</p>
+				))}
+			</div>
 
-                <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-sm text-slate-600">
-                            Active player: <span className="font-semibold text-slate-900">{game?.activePlayer?.profile.handle ?? "-"}</span>
-                        </div>
-                        <div className="text-sm text-slate-600">
-                            Phase: <span className="font-semibold text-slate-900">{game?.turnPhase ?? "-"}</span>
-                        </div>
-                        <div className="text-sm text-slate-600">
-                            Initial meld minimum: <span className="font-semibold text-slate-900">{activeMinimum}</span>
-                        </div>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                        <button
-                            type="button"
-                            onClick={handlePickupDiscard}
-                            disabled={!canPickupDiscard}
-                            className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left text-sm font-semibold text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <div>Discard Pile</div>
-                            <div className="mt-1 text-lg text-slate-900">
-                                {pileTop ? formatCard(pileTop) : "Empty"}
-                            </div>
-                            <div className="text-xs text-slate-500">Count: {game?.pile.cards.length ?? 0}</div>
-                        </button>
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 shadow-sm">
-                            <div className="font-semibold">Stock</div>
-                            <div className="mt-1 text-lg">{game?.stock.cards.length ?? 0} cards</div>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 shadow-sm">
-                            <div className="font-semibold">Selection</div>
-                            <div className="mt-1 text-xs text-slate-500">{selectedCards.length} cards selected</div>
-                            <div className="mt-1 text-xs text-slate-500">
-                                {meldTarget ? `Meld target: ${meldTarget.type} ${meldTarget.rank}` : "No valid meld"}
-                            </div>
-                        </div>
-                    </div>
-                    {error && (
-                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
-                            {error}
-                        </div>
-                    )}
-                </section>
+			{activeBoard && (
+				<>
+					<div style={{ marginBottom: "20px", border: "1px solid #ccc", padding: "10px" }}>
+						<h2>{gameState.players.find((p) => p.id === activePlayerId)?.name}'s Board</h2>
 
-                <section className="grid gap-4">
-                    {game?.players.map((player) => {
-                        const board = game.getPlayerBoard(player.id);
-                        const isActive = player.id === activePlayerId;
-                        const sortedHand = sortCards(board.hand.cards);
-                        const playerScore = game.calculatePlayerScore(player.id);
+						<div style={{ marginBottom: "15px" }}>
+							<h3>Hand ({activeBoard.hand.length})</h3>
+							<div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+								{sortCards(activeBoard.hand).map((card) => (
+									<button
+										key={card.id}
+										onClick={() => toggleCardSelection(card.id)}
+										style={{
+											padding: "8px",
+											background: selectedIds.has(card.id) ? "#4CAF50" : "#f0f0f0",
+											border: "1px solid #999",
+											borderRadius: "4px",
+											cursor: "pointer",
+											color: selectedIds.has(card.id) ? "white" : "black",
+										}}
+									>
+										{formatCard(card)}
+									</button>
+								))}
+							</div>
+						</div>
 
-                        return (
-                            <div key={player.id} className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-500" : "bg-slate-300"}`} />
-                                        <div className="text-lg font-semibold">{player.profile.handle}</div>
-                                    </div>
-                                    <div className="text-sm text-slate-600">Score: <span className="font-semibold text-slate-900">{playerScore}</span></div>
-                                </div>
-                                <div className="mt-3 grid gap-3 lg:grid-cols-3">
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                                        <div className="font-semibold text-slate-700">Red Threes</div>
-                                        <div className="mt-2 flex flex-wrap gap-2 text-slate-900">
-                                            {board.redThrees.cards.length === 0
-                                                ? "None"
-                                                : board.redThrees.cards.map((card) => (
-                                                    <span key={card.id} className="rounded-full bg-white px-2 py-1 text-xs shadow-sm">
-                                                        {formatCard(card)}
-                                                    </span>
-                                                ))}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                                        <div className="font-semibold text-slate-700">Melds</div>
-                                        <div className="mt-2 flex flex-col gap-2 text-slate-900">
-                                            {board.melds.length === 0
-                                                ? "None"
-                                                : board.melds.map((meld) => (
-                                                    <div key={meld.rank} className="rounded-lg bg-white px-2 py-1 text-xs shadow-sm">
-                                                        {meld.rank}: {meld.cards.map((card) => formatCard(card)).join(" ")}
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                                        <div className="font-semibold text-slate-700">Canastas</div>
-                                        <div className="mt-2 flex flex-col gap-2 text-slate-900">
-                                            {board.canastas.length === 0
-                                                ? "None"
-                                                : board.canastas.map((canasta) => (
-                                                    <div key={canasta.rank} className="rounded-lg bg-white px-2 py-1 text-xs shadow-sm">
-                                                        {canasta.rank}: {canasta.cards.map((card) => formatCard(card)).join(" ")}
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-                                    <div className="font-semibold text-slate-700">Hand ({sortedHand.length})</div>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {sortedHand.map((card) => {
-                                            const isSelected = selectedIds.has(card.id);
-                                            const isActiveHand = isActive && activePlayerId === player.id;
-                                            return (
-                                                <button
-                                                    key={card.id}
-                                                    type="button"
-                                                    onClick={() => isActiveHand && toggleSelect(card.id)}
-                                                    className={`rounded-full border px-2 py-1 text-xs shadow-sm transition ${
-                                                        isSelected
-                                                            ? "border-emerald-400 bg-emerald-100 text-emerald-900"
-                                                            : "border-slate-200 bg-white text-slate-800"
-                                                    } ${isActiveHand ? "hover:border-emerald-300" : "cursor-default opacity-60"}`}
-                                                >
-                                                    {formatCard(card)}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </section>
-            </div>
-        </div>
-    );
-}
+						<div style={{ marginBottom: "15px" }}>
+							<h3>Melds</h3>
+							{activeBoard.melds.map((meld: ICard[], idx: number) => (
+								<div key={idx} style={{ marginBottom: "10px" }}>
+									<strong>Meld {idx + 1}:</strong> {meld.map(formatCard).join(", ")}
+								</div>
+							))}
+						</div>
+
+						<div style={{ marginBottom: "15px" }}>
+							<h3>Canastas</h3>
+							{activeBoard.canastas.map((canasta: ICard[], idx: number) => (
+								<div key={idx} style={{ marginBottom: "10px" }}>
+									<strong style={{ color: "green" }}>Canasta {idx + 1}:</strong> {canasta.map(formatCard).join(", ")}
+								</div>
+							))}
+						</div>
+
+						<div style={{ marginBottom: "15px" }}>
+							<h3>Red Threes</h3>
+							{activeBoard.redThrees.length > 0
+								? activeBoard.redThrees.map((card: ICard) => formatCard(card)).join(", ")
+								: "None"}
+						</div>
+					</div>
+
+					<div style={{ marginBottom: "20px" }}>
+						<h2>Actions</h2>
+						{canDraw && (
+							<button onClick={handleDraw} style={{ padding: "10px", marginRight: "10px" }}>
+								Draw from Stock
+							</button>
+						)}
+						{canDiscard && (
+							<button onClick={handleDiscard} style={{ padding: "10px", marginRight: "10px" }}>
+								Discard Selected
+							</button>
+						)}
+						{canMeld && (
+							<button onClick={handleMeld} style={{ padding: "10px", marginRight: "10px" }}>
+								{meldTarget?.type === "new" ? "Play New Meld" : "Add to Meld"}
+							</button>
+						)}
+						{canPickupDiscard && (
+							<button onClick={handlePickupDiscard} style={{ padding: "10px", marginRight: "10px" }}>
+								Pickup Discard + Meld
+							</button>
+						)}
+						{canEndTurn && (
+							<button onClick={handleEndTurn} style={{ padding: "10px", marginRight: "10px" }}>
+								End Turn
+							</button>
+						)}
+						{canGoOut && (
+							<button onClick={handleGoOut} style={{ padding: "10px", marginRight: "10px", background: "#FFD700" }}>
+								Go Out!
+							</button>
+						)}
+					</div>
+				</>
+			)}
+
+			<div style={{ marginTop: "30px", marginBottom: "20px" }}>
+				<button
+					onClick={handleStartGame}
+					style={{ padding: "10px 20px", fontSize: "16px", background: "#ff9999" }}
+				>
+					Reset Game
+				</button>
+			</div>
+
+			{gameState.gameLog.length > 0 && (
+				<div style={{ marginTop: "20px", background: "#f5f5f5", padding: "10px" }}>
+					<h3>Game Log</h3>
+					<div style={{ fontSize: "12px", maxHeight: "200px", overflow: "auto" }}>
+						{gameState.gameLog.map((log, idx) => (
+							<div key={idx}>{log}</div>
+						))}
+					</div>
+				</div>
+			)}
+		</div>
+	);}
