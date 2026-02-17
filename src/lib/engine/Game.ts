@@ -23,6 +23,13 @@ const defaultRules = {
 
 export type TurnPhase = "draw" | "discard" | "complete-turn";
 
+export type GameEvent = {
+    type: "red-three-moved" | "replacement-drawn";
+    playerId: string;
+    card: ICard;
+    source: "turn-start" | "stock-draw";
+};
+
 export class Game implements IGame {
 	id = uuidv4();
 	players: IPlayer[] = [];
@@ -42,6 +49,7 @@ export class Game implements IGame {
     seatPositions: Map<string, number> = new Map(); // playerId -> seat (0-5)
     handNumber: number = 1; // Current hand number (1, 2, 3, ...)
     private openedTeams: Set<string> = new Set();
+    private recentEvents: GameEvent[] = [];
 
 	constructor(players: IPlayer[]) {
 		this.players = players;
@@ -72,7 +80,14 @@ export class Game implements IGame {
 		this.initializePlayerBoards();
 		this.turn = this.initTurn();
 		this.activePlayer = this.turn.player;
+        this.processTurnStartRedThrees(this.activePlayer.id);
 	}
+
+    consumeRecentEvents(): GameEvent[] {
+        const events = [...this.recentEvents];
+        this.recentEvents = [];
+        return events;
+    }
 
     drawStock(playerId: string): ICard {
         this.assertPlayerTurn(playerId);
@@ -80,18 +95,24 @@ export class Game implements IGame {
             throw new Error("You must draw before discarding or ending your turn.");
         }
 
-        // Handle first turn red three replacement
-        const isFirstTurn = this.turn?.startTime === this.activePlayer?.profile?.handle ? false : true;
-        
         let card = this.stock.draw();
         if (!card) {
             throw new Error("The stock is empty.");
         }
 
+        let replacingRedThree = false;
+
         // If red three drawn, place in redThrees and draw replacement
         while (this.isRedThree(card)) {
+            replacingRedThree = true;
             const board = this.getPlayerBoard(playerId);
             board.redThrees.cards.push(card);
+            this.recentEvents.push({
+                type: "red-three-moved",
+                playerId,
+                card,
+                source: "stock-draw",
+            });
             card = this.stock.draw();
             if (!card) {
                 throw new Error("The stock is empty.");
@@ -100,12 +121,20 @@ export class Game implements IGame {
 
         const hand = this.getHandByPlayerId(playerId);
         hand.cards.push(card);
+        if (replacingRedThree) {
+            this.recentEvents.push({
+                type: "replacement-drawn",
+                playerId,
+                card,
+                source: "stock-draw",
+            });
+        }
         this.turnPhase = "discard";
         return card;
     }
 
     private isRedThree(card: ICard): boolean {
-        return card.rank === "3" && (card.suit === "♥" || card.suit === "♦");
+        return card.rank === "3" && (card.suit === "❤️" || card.suit === "♦️");
     }
 
     getPlayerMelds(playerId: string): IMeld[] {
@@ -178,6 +207,7 @@ export class Game implements IGame {
         };
         this.activePlayer = nextPlayer;
         this.turnPhase = "draw";
+        this.processTurnStartRedThrees(nextPlayer.id);
     }
 
     getHandByPlayerId(playerId: string): IHand {
@@ -199,31 +229,13 @@ export class Game implements IGame {
 
     private initializePlayerBoards() {
         // Create a board for each player from their dealt hand
-        // Extract red threes from hands and draw replacements
+        // Red threes are processed when that player's turn starts
         this.players.forEach((player) => {
             const hand = this.hands.find((h) => h.player.id === player.id);
             if (!hand) {
                 throw new Error(`Hand not found for player ${player.id}`);
             }
-
-            // Find red threes in the dealt hand
-            const redThreesInHand = hand.cards.filter((card) => this.isRedThree(card));
-            
-            // Remove red threes from hand and draw replacements
-            redThreesInHand.forEach((card) => {
-                const idx = hand.cards.indexOf(card);
-                if (idx >= 0) {
-                    hand.cards.splice(idx, 1);
-                }
-                // Draw replacement from stock
-                const replacement = this.stock.draw();
-                if (replacement) {
-                    hand.cards.push(replacement);
-                }
-            });
-
-            // Create red threes stack (filled with cards just removed)
-            const redThreesStack = new CardStack(redThreesInHand) as unknown as IRedThrees;
+            const redThreesStack = new CardStack([]) as unknown as IRedThrees;
 
             const board: IPlayerBoard = {
                 playerId: player.id,
@@ -235,6 +247,56 @@ export class Game implements IGame {
 
             this.playerBoards.set(player.id, board);
         });
+    }
+
+    private processTurnStartRedThrees(playerId: string) {
+        const board = this.getPlayerBoard(playerId);
+        const hand = board.hand;
+
+        let idx = 0;
+        while (idx < hand.cards.length) {
+            const card = hand.cards[idx];
+            if (!this.isRedThree(card)) {
+                idx += 1;
+                continue;
+            }
+
+            hand.cards.splice(idx, 1);
+            board.redThrees.cards.push(card);
+            this.recentEvents.push({
+                type: "red-three-moved",
+                playerId,
+                card,
+                source: "turn-start",
+            });
+
+            while (true) {
+                const replacement = this.stock.draw();
+                if (!replacement) {
+                    break;
+                }
+
+                if (this.isRedThree(replacement)) {
+                    board.redThrees.cards.push(replacement);
+                    this.recentEvents.push({
+                        type: "red-three-moved",
+                        playerId,
+                        card: replacement,
+                        source: "turn-start",
+                    });
+                    continue;
+                }
+
+                hand.cards.push(replacement);
+                this.recentEvents.push({
+                    type: "replacement-drawn",
+                    playerId,
+                    card: replacement,
+                    source: "turn-start",
+                });
+                break;
+            }
+        }
     }
 
 	// private buildTeams(players: IPlayer[]): ITeam[] {

@@ -6,6 +6,14 @@ import { v4 as uuidv4 } from "uuid";
 // Store active test game in memory (single instance for testing)
 let testGame: Game | null = null;
 
+function successResponse(game: Game) {
+	return NextResponse.json({
+		success: true,
+		game: serializeGame(game),
+		events: game.consumeRecentEvents(),
+	});
+}
+
 export async function POST(req: NextRequest) {
 	try {
 		const { action, payload } = await req.json();
@@ -39,49 +47,29 @@ export async function POST(req: NextRequest) {
 				},
 			];
 
-			testGame = new Game(players, {
-				cardsDealt: 13,
-				minInitialMeld: 50,
-				wildCardRank: "Two",
-			});
+			testGame = new Game(players);
 			testGame.start();
-
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		if (action === "draw-stock" && testGame && payload.playerId) {
 			testGame.drawStock(payload.playerId);
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		if (action === "discard" && testGame && payload.playerId && payload.cardId) {
 			testGame.discard(payload.playerId, payload.cardId);
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		if (action === "end-turn" && testGame && payload.playerId) {
 			testGame.endTurn(payload.playerId);
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		if (action === "play-meld" && testGame && payload.playerId && payload.cardIds) {
 			testGame.playMeld(payload.playerId, payload.cardIds);
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		if (
@@ -92,10 +80,7 @@ export async function POST(req: NextRequest) {
 			payload.cardIds
 		) {
 			testGame.addToMeld(payload.playerId, payload.meldRank, payload.cardIds);
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		if (
@@ -105,25 +90,20 @@ export async function POST(req: NextRequest) {
 			payload.meldRank
 		) {
 			testGame.completeCanasta(payload.playerId, payload.meldRank);
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		if (action === "go-out" && testGame && payload.playerId) {
-			testGame.goOut(payload.playerId);
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			const board = testGame.getPlayerBoard(payload.playerId);
+			if (board.hand.cards.length !== 1) {
+				throw new Error("Go out requires exactly one card in hand.");
+			}
+			testGame.discard(payload.playerId, board.hand.cards[0].id);
+			return successResponse(testGame);
 		}
 
 		if (action === "get-state" && testGame) {
-			return NextResponse.json({
-				success: true,
-				game: serializeGame(testGame),
-			});
+			return successResponse(testGame);
 		}
 
 		return NextResponse.json({ success: false, error: "Invalid action" });

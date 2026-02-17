@@ -3,6 +3,7 @@
 import { useMemo, useState, useCallback } from "react";
 import type { ICard } from "@/schema/server/ICard";
 import type { IMeld } from "@/schema/server/IMeld";
+import type { ICanasta } from "@/schema/server/ICanasta";
 
 type GameState = {
 	status: string;
@@ -16,6 +17,13 @@ type GameState = {
 	gameLog: string[];
 };
 
+type EngineEvent = {
+	type: "red-three-moved" | "replacement-drawn";
+	playerId: string;
+	card: ICard;
+	source: "turn-start" | "stock-draw";
+};
+
 type MeldTarget = {
 	type: "add" | "new";
 	rank: string;
@@ -24,11 +32,6 @@ type MeldTarget = {
 const rankOrder = ["W", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"] as const;
 
 const playerNames = ["Alice", "Bob", "Carla", "Drew"];
-
-type MeldTarget = {
-    type: "add" | "new";
-    rank: string;
-};
 
 function isWildCard(card: ICard): boolean {
     return card.rank === "2" || card.rank === "W";
@@ -100,6 +103,7 @@ export function EngineTestScreen() {
 	const [gameState, setGameState] = useState<GameState | null>(null);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 	const [error, setError] = useState<string | null>(null);
+	const [eventLog, setEventLog] = useState<string[]>([]);
 
 	const activePlayerId = gameState?.activePlayerId;
 	const activeBoard = activePlayerId && gameState ? gameState.playerBoards.find((b: any) => b.playerId === activePlayerId) : null;
@@ -141,6 +145,16 @@ export function EngineTestScreen() {
 				return;
 			}
 			setGameState(data.game);
+			if (Array.isArray(data.events) && data.events.length > 0) {
+				const lines = (data.events as EngineEvent[]).map((event) => {
+					const playerName = data.game.players.find((p: any) => p.id === event.playerId)?.name ?? event.playerId;
+					if (event.type === "red-three-moved") {
+						return `[${event.source}] ${playerName}: moved red three ${formatCard(event.card)} to red threes`;
+					}
+					return `[${event.source}] ${playerName}: drew replacement ${formatCard(event.card)}`;
+				});
+				setEventLog((prev) => [...lines, ...prev].slice(0, 100));
+			}
 			setError(null);
 		} catch (err) {
 			setError(String(err));
@@ -148,6 +162,7 @@ export function EngineTestScreen() {
 	}, []);
 
 	const handleStartGame = useCallback(() => {
+		setEventLog([]);
 		callApi("start");
 	}, [callApi]);
 
@@ -171,7 +186,7 @@ export function EngineTestScreen() {
 
 	const handleMeld = useCallback(() => {
 		if (!activePlayerId || !meldTarget) return;
-		const cardIds = selectedCards.map((c) => c.id);
+		const cardIds = selectedCards.map((c: ICard) => c.id);
 		if (meldTarget.type === "new") {
 			callApi("play-meld", { playerId: activePlayerId, cardIds });
 		} else {
@@ -274,18 +289,18 @@ export function EngineTestScreen() {
 
 						<div style={{ marginBottom: "15px" }}>
 							<h3>Melds</h3>
-							{activeBoard.melds.map((meld: ICard[], idx: number) => (
+							{activeBoard.melds.map((meld: IMeld, idx: number) => (
 								<div key={idx} style={{ marginBottom: "10px" }}>
-									<strong>Meld {idx + 1}:</strong> {meld.map(formatCard).join(", ")}
+									<strong>Meld {idx + 1}:</strong> {meld.cards.map(formatCard).join(", ")}
 								</div>
 							))}
 						</div>
 
 						<div style={{ marginBottom: "15px" }}>
 							<h3>Canastas</h3>
-							{activeBoard.canastas.map((canasta: ICard[], idx: number) => (
+							{activeBoard.canastas.map((canasta: ICanasta, idx: number) => (
 								<div key={idx} style={{ marginBottom: "10px" }}>
-									<strong style={{ color: "green" }}>Canasta {idx + 1}:</strong> {canasta.map(formatCard).join(", ")}
+									<strong style={{ color: "green" }}>Canasta {idx + 1}:</strong> {canasta.cards.map(formatCard).join(", ")}
 								</div>
 							))}
 						</div>
@@ -343,15 +358,16 @@ export function EngineTestScreen() {
 				</button>
 			</div>
 
-			{gameState.gameLog.length > 0 && (
+			{eventLog.length > 0 && (
 				<div style={{ marginTop: "20px", background: "#f5f5f5", padding: "10px" }}>
-					<h3>Game Log</h3>
+					<h3>Event Log</h3>
 					<div style={{ fontSize: "12px", maxHeight: "200px", overflow: "auto" }}>
-						{gameState.gameLog.map((log, idx) => (
+						{eventLog.map((log, idx) => (
 							<div key={idx}>{log}</div>
 						))}
 					</div>
 				</div>
 			)}
 		</div>
-	);}
+	);
+}
