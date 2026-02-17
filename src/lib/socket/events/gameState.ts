@@ -3,6 +3,9 @@ import type { IClientCard } from "@/schema/shared/IClientCard.js";
 import type { IClientGame } from "@/schema/shared/IClientGame.js";
 import type { IClientHand } from "@/schema/shared/IClientHand.js";
 import type { IClientPlayer } from "@/schema/shared/IClientPlayer.js";
+import type { IClientRedThrees } from "@/schema/shared/IClientRedThrees.js";
+import type { IClientCanasta } from "@/schema/shared/IClientCanasta.js";
+import type { IClientMeld } from "@/schema/shared/IClientMeld.js";
 import { Game } from "../../engine/Game.js";
 import { serverMemory } from "../../server/serverMemory.js";
 import { logger } from "../../server/logger.js";
@@ -17,13 +20,63 @@ function toClientCard(card: ICard): IClientCard {
     };
 }
 
+function toClientRedThrees(cards: ICard[]): IClientRedThrees {
+    return {
+        id: `red-threes-${cards.length}`,
+        cards: cards.map(toClientCard),
+    };
+}
+
+function toClientCanasta(rank: string, cards: ICard[], hasWildCard: boolean): IClientCanasta {
+    return {
+        id: `canasta-${rank}`,
+        rank,
+        cards: cards.map(toClientCard),
+        hasWildCard,
+    };
+}
+
+function toClientMeld(rank: string, cards: ICard[], hasWildCard: boolean): IClientMeld {
+    return {
+        id: `meld-${rank}`,
+        rank,
+        cards: cards.map(toClientCard),
+        hasWildCard,
+    };
+}
+
 function toClientGame(game: Game, playerId: string): IClientGame {
     const players: IClientPlayer[] = game.players.map((player) => {
         const hand = game.hands.find((playerHand) => playerHand.player.id === player.id);
+        const seatPosition = game.seatPositions.get(player.id) ?? 0;
+        const playerTeam = game.teams.find((t) => t.players.includes(player));
+        
+        // Extract from player's board
+        const board = game.playerBoards.get(player.id);
+        const redThrees = toClientRedThrees(board?.redThrees.cards ?? []);
+        const canastas: IClientCanasta[] = board?.canastas.map((canasta) => 
+            toClientCanasta(canasta.rank, canasta.cards, canasta.hasWildCard)
+        ) ?? [];
+        const melds: IClientMeld[] = board?.melds.map((meld) => {
+            const hasWildCard = meld.meldType === 'mixed';
+            return toClientMeld(meld.rank, meld.cards, hasWildCard);
+        }) ?? [];
+        
+        const meldScore = game.calculateMeldScore(player.id);
+        const score = game.calculatePlayerScore(player.id);
+        
         return {
             id: player.id,
             handle: player.profile.handle,
             cardCount: hand?.cards.length ?? 0,
+            seatPosition,
+            teamId: playerTeam?.id,
+            avatar: player.profile.avatar,
+            score,
+            redThrees,
+            canastas,
+            melds,
+            meldScore,
         };
     });
 
@@ -46,6 +99,10 @@ function toClientGame(game: Game, playerId: string): IClientGame {
         turnPhase: game.turnPhase,
         status: game.status,
         winnerPlayerId: game.winnerPlayerId,
+        teams: game.teams.map((t) => ({
+            id: t.id,
+            playerIds: t.players.map((p) => p.id),
+        })),
     };
 }
 

@@ -174,20 +174,55 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 	const pileCount = game?.pileCount ?? 15;
 	const pileCardAsset = getCardAsset(game?.pileTopCard);
 
+	// Helper to map seat position to CSS position class
+	// Calculates relative position from current player's perspective
+	const getPositionClass = (currentPlayerSeat: number, opponentSeat: number, totalPlayers: number): string => {
+		if (totalPlayers === 2) {
+			// 2 players: opponent is always opposite (at top from current player's view)
+			return "left-1/2 top-1 -translate-x-1/2";
+		}
+		
+		// Calculate relative position: how many seats clockwise from current player
+		const relativePosition = (opponentSeat - currentPlayerSeat + totalPlayers) % totalPlayers;
+		
+		// Map relative positions to screen positions
+		const positions: Record<number, string> = {
+			1: "left-1/2 top-1 -translate-x-1/2", // 1 seat clockwise = top
+			2: "right-0 top-12 sm:top-14", // 2 seats clockwise = top-right
+			3: "right-0 top-56 sm:top-60", // 3 seats clockwise = right (opposite)
+			4: "right-0 bottom-1", // 4 seats clockwise = bottom-right
+			5: "left-1/2 bottom-1 -translate-x-1/2", // 5 seats clockwise = bottom
+		};
+		return positions[relativePosition] || positions[1];
+	};
+
 	const opponentSeats = useMemo(() => {
-		const opponents = (game?.players ?? []).filter((player) => player.id !== myPlayerId);
-		return seatTemplates.map((seat, index) => {
-			const assigned = opponents[index];
-			return {
-				key: seat.key,
-				name: assigned?.handle ?? seat.defaultName,
-				score: formatScore(1595),
-				cardCount: assigned?.cardCount ?? 11,
-				avatar: seat.avatar,
-				positionClassName: seat.positionClassName,
+		if (!game || !myPlayerId) return [];
+		
+		// Find current player's seat position
+		const currentPlayer = game.players.find((p) => p.id === myPlayerId);
+		const currentPlayerSeat = currentPlayer?.seatPosition ?? 0;
+		
+		const opponents = game.players.filter((player) => player.id !== myPlayerId);
+		
+		// Map each opponent to their seat position  
+		return opponents.map((opponent) => {
+			const seat = {
+				key: opponent.id,
+				id: opponent.id,
+				name: opponent.handle,
+				score: formatScore(opponent.score),
+				cardCount: opponent.cardCount,
+				avatar: opponent.avatar || "/avatars/Avatar3.png",
+				positionClassName: getPositionClass(currentPlayerSeat, opponent.seatPosition, game.players.length),
+				redThrees: opponent.redThrees as any,
+				canastas: opponent.canastas ?? [],
+				melds: opponent.melds ?? [],
+				handScore: opponent.meldScore?.toString() ?? "0",
 			};
+			return seat;
 		});
-	}, [game?.players, myPlayerId]);
+	}, [game?.players, myPlayerId, game?.status]);
 
 	const handCards = game?.hand.cards ?? [];
 	const renderedHandCards = 0 < handCards.length
@@ -242,11 +277,16 @@ export function GameScreen({ user, socketRef, onGameEnd }: GameScreenProps) {
 				{opponentSeats.map((seat) => (
 					<OpponentSeat
 						key={seat.key}
+						id={seat.id}
 						name={seat.name}
 						score={seat.score}
 						avatar={seat.avatar}
 						cardCount={seat.cardCount}
 						positionClassName={seat.positionClassName}
+						redThrees={seat.redThrees}
+						canastas={seat.canastas}
+						melds={seat.melds}
+						handScore={seat.handScore}
 					/>
 				))}
 

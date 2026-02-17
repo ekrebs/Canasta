@@ -43,6 +43,27 @@ export function onGameAction(socket: Socket, io: Server, payload: IGameActionPay
             case "end-turn":
                 game.endTurn(connectedPlayer.playerId);
                 break;
+            case "play-meld":
+                if (!payload.cardIds || payload.cardIds.length === 0) {
+                    throw new Error("Play meld requires card IDs.");
+                }
+                game.playMeld(connectedPlayer.playerId, payload.cardIds);
+                break;
+            case "add-to-meld":
+                if (!payload.meldRank) {
+                    throw new Error("Add to meld requires a meld rank.");
+                }
+                if (!payload.cardIds || payload.cardIds.length === 0) {
+                    throw new Error("Add to meld requires card IDs.");
+                }
+                game.addToMeld(connectedPlayer.playerId, payload.meldRank, payload.cardIds);
+                break;
+            case "complete-canasta":
+                if (!payload.meldRank) {
+                    throw new Error("Complete canasta requires a meld rank.");
+                }
+                game.completeCanasta(connectedPlayer.playerId, payload.meldRank);
+                break;
             default:
                 throw new Error("Unsupported game action.");
         }

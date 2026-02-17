@@ -13,4 +13,5 @@ export interface IClientGame {
     turnPhase: "draw" | "discard" | "complete-turn",
     status: "Not Started" | "Active" | "Terminated" | "Complete",
     winnerPlayerId?: string,
+    teams: Array<{ id: string; playerIds: string[] }>,
 }

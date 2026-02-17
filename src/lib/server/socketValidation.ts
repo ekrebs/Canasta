@@ -19,8 +19,10 @@ export const LeaveLobbyPayloadSchema = z.object({
 });
 
 export const GameActionPayloadSchema = z.object({
-	action: z.enum(['draw-stock', 'discard', 'end-turn']),
+	action: z.enum(['draw-stock', 'discard', 'end-turn', 'play-meld', 'add-to-meld', 'complete-canasta']),
 	cardId: z.string().optional(),
+	cardIds: z.array(z.string()).optional(),
+	meldRank: z.string().optional(),
 });
 
 export const DisconnectLobbyPayloadSchema = z.object({

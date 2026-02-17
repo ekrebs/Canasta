@@ -16,6 +16,7 @@ export class Game {
         this.hands = [];
         this.status = "Not Started";
         this.turnPhase = "draw";
+        this.seatPositions = new Map(); // playerId -> seat (0-5)
         this.players = players;
         // this.teams = this.buildTeams(players);
         const deck1 = new Deck();
@@ -37,6 +38,7 @@ export class Game {
         this.turnPhase = "draw";
         this.stock.shuffle();
         this.dealer = this.pickDealer();
+        this.assignSeatPositions();
         this.dealCards();
         this.turn = this.initTurn();
         this.activePlayer = this.turn.player;
@@ -136,6 +138,44 @@ export class Game {
             player: this.players[nextIndex],
             startTime: new Date().toISOString(),
         };
+    }
+    assignSeatPositions() {
+        // Assign random seat positions to players
+        // For teams: team seats are 0, 1, 2 (3 teams max)
+        // For no teams: player seats are 0-5 (6 players max)
+        const playerCount = this.players.length;
+        const hasTeams = this.teams.length > 0;
+        if (hasTeams) {
+            // Team-based seating: each team gets a seat (0-2)
+            const teamSeats = new Map();
+            const teamList = this.teams.map((t, i) => ({ id: t.id, index: i }));
+            const shuffledTeams = teamList.sort(() => Math.random() - 0.5);
+            shuffledTeams.forEach((team, idx) => {
+                teamSeats.set(team.id, idx);
+            });
+            // Assign players to seats based on their team
+            this.players.forEach((player) => {
+                const playerTeam = this.teams.find((t) => t.players.includes(player));
+                if (playerTeam) {
+                    const teamSeat = teamSeats.get(playerTeam.id) || 0;
+                    // Team member on same side sits at teamSeat * 2, opposite at teamSeat * 2 + 1
+                    const sameTeamCount = this.players.filter((p) => this.teams.find((t) => t.players.includes(p))?.id === playerTeam.id).length;
+                    const teamIndex = this.teams
+                        .find((t) => t.players.includes(player))
+                        ?.players.indexOf(player) || 0;
+                    const seat = (teamSeat * 2) + teamIndex;
+                    this.seatPositions.set(player.id, seat);
+                }
+            });
+        }
+        else {
+            // No teams: random seat assignment (0-5)
+            const seats = Array.from({ length: playerCount }, (_, i) => i);
+            seats.sort(() => Math.random() - 0.5);
+            this.players.forEach((player, idx) => {
+                this.seatPositions.set(player.id, seats[idx]);
+            });
+        }
     }
     assertPlayerTurn(playerId) {
         if (this.status !== "Active") {

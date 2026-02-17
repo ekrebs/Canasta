@@ -14,13 +14,13 @@ describe('Game Engine', () => {
 			{
 				id: 'player1',
 				index: 0,
-				profile: { id: 'user1', handle: 'Player 1' },
+				profile: { id: 'user1', handle: 'Player 1', avatar: '/avatars/Avatar1.png' },
 				isBot: false,
 			},
 			{
 				id: 'player2',
 				index: 1,
-				profile: { id: 'user2', handle: 'Player 2' },
+				profile: { id: 'user2', handle: 'Player 2', avatar: '/avatars/Avatar2.png' },
 				isBot: false,
 			},
 		];
